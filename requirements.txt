@@ -2,6 +2,7 @@ streamlit
 openai
 langchain
 langchain-openai
+langchain-community
 python-dotenv
 pypdf
 tiktoken
