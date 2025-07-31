@@ -1,9 +1,18 @@
+import os
 import streamlit as st
+from langchain.chains import RetrievalQA
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_community.vectorstores import FAISS
+from dotenv import load_dotenv
 
-# Page settings
+# Load API key
+load_dotenv()
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Streamlit page config
 st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="centered")
 
-# HTML/CSS Styling + UI Elements
+# ---- UI Styling and Layout ----
 st.markdown("""
 <style>
   body {
@@ -122,24 +131,48 @@ st.markdown("""
 <div class="question-label">🔍 Ask about a local policy or form</div>
 """, unsafe_allow_html=True)
 
-# Input field
+# ---- Input UI ----
 question = st.text_input("e.g. Do I need a permit to cut down a tree?", key="question_box", label_visibility="collapsed")
 
-# Query response logic placeholder
-if question:
-    st.write("🔎 Searching Wyndham Council documents...")
-    # Replace this with your LangChain logic:
-    # answer = qa_chain.run(question)
-    # st.success(answer)
+# ---- Query Tracking ----
+if "query_count" not in st.session_state:
+    st.session_state.query_count = 0
 
-# Upload note + Footer
-st.markdown("""
+# ---- VectorStore + Retrieval Chain Setup ----
+try:
+    db = FAISS.load_local("index/wyndham", OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY))
+    retriever = db.as_retriever()
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=ChatOpenAI(model="gpt-4", openai_api_key=OPENAI_API_KEY),
+        retriever=retriever
+    )
+except Exception as e:
+    st.error("❌ Failed to load documents or embeddings. Please check your index folder.")
+    st.stop()
+
+# ---- Handle Question ----
+if question:
+    st.session_state.query_count += 1
+    st.write("🔎 Searching Wyndham Council documents...")
+    try:
+        answer = qa_chain.run(question)
+        st.success(answer)
+    except Exception as e:
+        st.error("❌ Error processing your question. Check OpenAI key or vector DB.")
+
+# ---- Admin Upload Placeholder ----
+uploaded_file = st.file_uploader("Upload new Wyndham PDFs (Admin only)", type="pdf")
+if uploaded_file:
+    st.warning("📥 Upload feature is admin-only and currently not connected to retraining logic.")
+
+# ---- Footer ----
+st.markdown(f"""
 <div class="upload-note">
   🔒 Upload new Wyndham PDFs (Admin only) – Only verified admins can upload documents.
 </div>
 
 <div class="footer">
-  ⚙️ Powered by LangChain + OpenAI |
-  Contact: <a href="mailto:wyndham@vic.gov.au">wyndham@vic.gov.au</a>
+  ⚙️ Powered by LangChain + OpenAI | Queries used: {st.session_state.query_count} / 500  
+  <br>Contact: <a href="mailto:wyndham@vic.gov.au">wyndham@vic.gov.au</a>
 </div>
 """, unsafe_allow_html=True)
