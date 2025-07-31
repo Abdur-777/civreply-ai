@@ -16,7 +16,7 @@ def load_qa():
 
     if not os.path.exists(index_dir):
         with st.spinner("No FAISS index found. Creating one from /docs..."):
-            print("📂 Files Render sees in /docs:", os.listdir("docs"))  # 👈 LOG LINE HERE
+            print("📂 Files Render sees in /docs:", os.listdir("docs"))
             loader = PyPDFDirectoryLoader("docs")
             documents = loader.load()
 
@@ -26,6 +26,7 @@ def load_qa():
 
             splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
             split_docs = splitter.split_documents(documents)
+            print(f"🧠 Number of split documents: {len(split_docs)}")  # ✅ FIXED INDENT
 
             if not split_docs:
                 st.error("❌ No text chunks found in documents. Make sure your PDFs contain selectable text (not just scanned images).")
