@@ -1,3 +1,4 @@
+# CivReply AI – Upgraded Version with Admin Login, Multi-Council Support, Stripe, and More
 import os
 import streamlit as st
 from langchain.chains import RetrievalQA
@@ -7,198 +8,116 @@ from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-# Load API key
+# Load environment variables
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+STRIPE_LINK = os.getenv("STRIPE_LINK", "https://buy.stripe.com/test_xxx")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "supersecret")
 
-# Streamlit page config
-st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="centered")
+st.set_page_config(page_title="CivReply AI", page_icon="\U0001F3DB\uFE0F", layout="centered")
 
-# ---- UI Styling and Layout ----
-st.markdown("""
+# --- Admin Auth ---
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
+
+if not st.session_state.is_admin:
+    password = st.text_input("Enter Admin Password to Enable Upload", type="password")
+    if password == ADMIN_PASSWORD:
+        st.session_state.is_admin = True
+        st.success("✅ Admin access granted.")
+    elif password:
+        st.error("❌ Incorrect password")
+
+# --- Council Selector ---
+council = st.selectbox("Choose Council", ["Wyndham", "Brimbank", "Hobsons Bay"])
+council_key = council.lower().replace(" ", "_")
+index_path = f"index/{council_key}"
+
+# --- Branding ---
+st.markdown(f"""
 <style>
-  body {
-    font-family: 'Segoe UI', sans-serif;
-  }
-
-  .header {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    margin-bottom: 10px;
-  }
-
-  .header h1 {
-    font-size: 2.5rem;
-    margin: 0;
-  }
-
-  .tagline {
-    text-align: center;
-    font-size: 1.1rem;
-    color: #555;
-    margin-bottom: 20px;
-  }
-
-  .user-info-bar {
-    background-color: #f0f2f6;
-    padding: 10px 15px;
-    border-radius: 12px;
-    font-size: 0.95rem;
-    color: #333;
-    margin-bottom: 20px;
-    display: flex;
-    justify-content: space-between;
-  }
-
-  .user-info-bar span {
-    font-weight: 500;
-  }
-
-  .plan-box {
-    background-color: #eef6ff;
-    padding: 12px 15px;
-    border-radius: 10px;
-    margin: 10px 0 30px;
-    font-size: 0.9rem;
-    color: #1d4ed8;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .plan-box a {
-    text-decoration: none;
-    background-color: #1d4ed8;
-    color: white;
-    padding: 5px 10px;
-    border-radius: 6px;
-    font-size: 0.85rem;
-  }
-
-  .question-box {
-    background-color: #f9fafb;
-    border: 1px solid #d1d5db;
-    border-radius: 10px;
-    padding: 16px;
-    font-size: 1rem;
-    color: #111827;
-    width: 100%;
-  }
-
-  .question-label {
-    font-size: 1rem;
-    margin-bottom: 6px;
-    color: #374151;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .upload-note {
-    font-size: 0.85rem;
-    color: #6b7280;
-    margin-top: -6px;
-    margin-bottom: 18px;
-  }
-
-  .footer {
-    text-align: center;
-    font-size: 0.85rem;
-    color: #6b7280;
-    margin-top: 30px;
-  }
+  body {{ font-family: 'Segoe UI', sans-serif; }}
+  .header {{ display: flex; justify-content: center; gap: 12px; margin-bottom: 10px; }}
+  .header h1 {{ font-size: 2.5rem; margin: 0; }}
+  .tagline {{ text-align: center; font-size: 1.1rem; color: #555; margin-bottom: 20px; }}
+  .user-info-bar, .plan-box {{ background-color: #eef6ff; padding: 10px 15px; border-radius: 12px; margin-bottom: 20px; }}
+  .question-label {{ font-size: 1rem; color: #374151; margin-bottom: 6px; }}
+  .footer {{ text-align: center; font-size: 0.85rem; color: #6b7280; margin-top: 30px; }}
 </style>
-
 <div class="header">
-  <div style="font-size: 2rem;">🏛️</div>
+  <div style="font-size: 2rem;">\U0001F3DB\uFE0F</div>
   <h1>CivReply AI</h1>
 </div>
-
-<div class="tagline">
-  Ask Wyndham Council anything – policies, laws, documents.
-</div>
-
-<div class="user-info-bar">
-  <div><span>🧑 Council:</span> Wyndham</div>
-  <div><span>🔐 Role:</span> Admin</div>
-</div>
-
-<div class="plan-box">
-  <div>📦 <strong>Plan:</strong> Basic – 500 queries/month | 1 user</div>
-  <a href="#">Upgrade →</a>
-</div>
-
-<div class="question-label">🔍 Ask about a local policy or form</div>
+<div class="tagline">Ask {council} Council anything – policies, laws, documents.</div>
+<div class="user-info-bar">🧑 Council: {council} | 🔐 Role: {'Admin' if st.session_state.is_admin else 'Guest'}</div>
+<div class="plan-box">📦 Plan: Basic – 500 queries/month | 1 user | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
+<div class="question-label">🔍 Ask a local question:</div>
 """, unsafe_allow_html=True)
 
-# ---- Input UI ----
+# --- Input UI ---
 question = st.text_input("e.g. Do I need a permit to cut down a tree?", key="question_box", label_visibility="collapsed")
 
-# ---- Query Tracking ----
 if "query_count" not in st.session_state:
     st.session_state.query_count = 0
 
-# ---- VectorStore + Retrieval Chain Setup ----
+# --- Load Vector Index ---
 try:
-    db = FAISS.load_local("index/wyndham", OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY))
+    db = FAISS.load_local(index_path, OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY))
     retriever = db.as_retriever()
     qa_chain = RetrievalQA.from_chain_type(
         llm=ChatOpenAI(model="gpt-4", openai_api_key=OPENAI_API_KEY),
-        retriever=retriever
+        retriever=retriever,
+        return_source_documents=True
     )
 except Exception as e:
-    st.error("❌ Failed to load documents or embeddings. Please check your index folder.")
+    st.error(f"❌ Could not load index for {council}: {str(e)}")
     st.stop()
 
-# ---- Handle Question ----
+# --- Handle Question ---
 if question:
     st.session_state.query_count += 1
-    st.write("🔎 Searching Wyndham Council documents...")
+    st.write("🔎 Searching documents...")
     try:
-        answer = qa_chain.run(question)
-        st.success(answer)
+        result = qa_chain({"query": question})
+        st.success(result["result"])
+        with st.expander("📄 View sources"):
+            for doc in result["source_documents"]:
+                st.caption(f"• {doc.metadata.get('source', 'Unknown source')}")
     except Exception as e:
-        st.error("❌ Error processing your question. Check OpenAI key or vector DB.")
+        st.error(f"❌ Error: {str(e)}")
 
-# ---- PDF Upload + Live Index Rebuild ----
-def process_and_index_pdf(uploaded_file):
+# --- PDF Upload + FAISS Rebuild ---
+def process_and_index_pdf(uploaded_files):
     try:
-        with open("temp_uploaded.pdf", "wb") as f:
-            f.write(uploaded_file.read())
+        all_docs = []
+        for file in uploaded_files:
+            with open("temp.pdf", "wb") as f:
+                f.write(file.read())
+            loader = PyPDFLoader("temp.pdf")
+            all_docs.extend(loader.load())
 
-        loader = PyPDFLoader("temp_uploaded.pdf")
-        documents = loader.load()
-
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        split_docs = text_splitter.split_documents(documents)
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        split_docs = splitter.split_documents(all_docs)
 
         embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
         faiss_index = FAISS.from_documents(split_docs, embeddings)
+        faiss_index.save_local(index_path)
 
-        faiss_index.save_local("index/wyndham")
-
-        st.success("✅ Document uploaded and FAISS index updated.")
+        st.success(f"✅ Index for {council} updated with {len(uploaded_files)} file(s).")
         st.experimental_rerun()
 
     except Exception as e:
-        st.error(f"❌ Failed to process document: {str(e)}")
+        st.error(f"❌ Failed to process: {str(e)}")
 
-uploaded_file = st.file_uploader("Upload new Wyndham PDFs (Admin only)", type="pdf")
-if uploaded_file:
-    st.info("📄 Uploaded file received. Click below to index it.")
-    if st.button("🔄 Rebuild Search Index"):
-        process_and_index_pdf(uploaded_file)
+if st.session_state.is_admin:
+    uploaded_files = st.file_uploader("📤 Upload PDFs for this council", type="pdf", accept_multiple_files=True)
+    if uploaded_files and st.button("🔄 Rebuild Index"):
+        process_and_index_pdf(uploaded_files)
 
-# ---- Footer ----
+# --- Footer ---
 st.markdown(f"""
-<div class="upload-note">
-  🔒 Upload new Wyndham PDFs (Admin only) – Only verified admins can upload documents.
-</div>
-
 <div class="footer">
-  ⚙️ Powered by LangChain + OpenAI | Queries used: {st.session_state.query_count} / 500  
-  <br>Contact: <a href="mailto:wyndham@vic.gov.au">wyndham@vic.gov.au</a>
+  ⚙️ Powered by LangChain + GPT-4 | Queries used: {st.session_state.query_count} / 500<br>
+  📬 Contact: <a href="mailto:contact@civreply.ai">contact@civreply.ai</a>
 </div>
 """, unsafe_allow_html=True)
