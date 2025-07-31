@@ -177,3 +177,62 @@ st.markdown(f"""
   📬 Contact: <a href="mailto:contact@civreply.ai">contact@civreply.ai</a>
 </div>
 """, unsafe_allow_html=True)
+# --- Gmail Auto-Reply (Admin Only) ---
+import imaplib
+import smtplib
+import email
+from email.mime.text import MIMEText
+
+def auto_reply_emails():
+    try:
+        imap_host = 'imap.gmail.com'
+        smtp_host = 'smtp.gmail.com'
+        smtp_port = 587
+
+        email_user = os.getenv("GMAIL_USER")
+        email_pass = os.getenv("GMAIL_PASS")
+
+        if not email_user or not email_pass:
+            st.warning("⚠️ Missing Gmail credentials in .env file.")
+            return
+
+        mail = imaplib.IMAP4_SSL(imap_host)
+        mail.login(email_user, email_pass)
+        mail.select("inbox")
+
+        _, message_nums = mail.search(None, '(UNSEEN SUBJECT "CivReply")')
+        message_nums = message_nums[0].split()
+
+        if not message_nums:
+            st.info("📭 No new council emails to reply to.")
+            return
+
+        for num in message_nums:
+            _, data = mail.fetch(num, '(RFC822)')
+            raw_email = data[0][1]
+            msg = email.message_from_bytes(raw_email)
+            from_email = email.utils.parseaddr(msg["From"])[1]
+            subject = msg["Subject"]
+
+            body = "Thank you for reaching out to CivReply AI. We will get back to you shortly.\n\nFor urgent requests, contact support@civreply.ai."
+
+            reply = MIMEText(body)
+            reply["Subject"] = f"RE: {subject}"
+            reply["From"] = email_user
+            reply["To"] = from_email
+
+            server = smtplib.SMTP(smtp_host, smtp_port)
+            server.starttls()
+            server.login(email_user, email_pass)
+            server.sendmail(email_user, from_email, reply.as_string())
+            server.quit()
+
+        st.success(f"📧 Replied to {len(message_nums)} new council email(s).")
+
+    except Exception as e:
+        st.error(f"❌ Failed to auto-reply: {str(e)}")
+
+
+if st.session_state.is_admin:
+    if st.button("📬 Auto-Reply to Council Emails"):
+        auto_reply_emails()
