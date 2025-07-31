@@ -104,3 +104,4 @@ target/
 *.bak
 *.tmp
 *.swp
+.env
