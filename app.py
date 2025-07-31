@@ -18,8 +18,18 @@ def load_qa():
         with st.spinner("No FAISS index found. Creating one from /docs..."):
             loader = PyPDFDirectoryLoader("docs")
             documents = loader.load()
+
+            if not documents:
+                st.error("❌ No documents loaded. Make sure /docs contains readable PDFs.")
+                st.stop()
+
             splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
             split_docs = splitter.split_documents(documents)
+
+            if not split_docs:
+                st.error("❌ No text chunks found in documents. Make sure your PDFs contain selectable text (not just scanned images).")
+                st.stop()
+
             db = FAISS.from_documents(split_docs, embeddings)
             db.save_local(index_dir)
     else:
@@ -28,6 +38,7 @@ def load_qa():
     retriever = db.as_retriever()
     llm = ChatOpenAI(temperature=0)
     return RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
+
 
 qa = load_qa()
 
