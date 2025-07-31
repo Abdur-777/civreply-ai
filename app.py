@@ -14,7 +14,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 STRIPE_LINK = os.getenv("STRIPE_LINK", "https://buy.stripe.com/test_xxx")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "supersecret")
 
-st.set_page_config(page_title="CivReply AI", page_icon="\U0001F3DB\uFE0F", layout="centered")
+st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="centered")
 
 # --- Admin Auth ---
 if "is_admin" not in st.session_state:
@@ -45,7 +45,7 @@ st.markdown(f"""
   .footer {{ text-align: center; font-size: 0.85rem; color: #6b7280; margin-top: 30px; }}
 </style>
 <div class="header">
-  <div style="font-size: 2rem;">\U0001F3DB\uFE0F</div>
+  <div style="font-size: 2rem;">🏛️</div>
   <h1>CivReply AI</h1>
 </div>
 <div class="tagline">Ask {council} Council anything – policies, laws, documents.</div>
@@ -62,7 +62,7 @@ if "query_count" not in st.session_state:
 
 # --- Load Vector Index ---
 try:
-    db = FAISS.load_local(index_path, OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY))
+    db = FAISS.load_local(index_path, OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY), allow_dangerous_deserialization=True)
     retriever = db.as_retriever()
     qa_chain = RetrievalQA.from_chain_type(
         llm=ChatOpenAI(model="gpt-4", openai_api_key=OPENAI_API_KEY),
