@@ -1,8 +1,10 @@
 import streamlit as st
+import os
 from langchain.chains import RetrievalQA
-from langchain_openai import ChatOpenAI
 from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFDirectoryLoader
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 
 st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="centered")
 st.title("🏛️ CivReply AI – Ask Wyndham Council Anything")
@@ -10,15 +12,28 @@ st.title("🏛️ CivReply AI – Ask Wyndham Council Anything")
 @st.cache_resource
 def load_qa():
     embeddings = OpenAIEmbeddings()
-    db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+    index_dir = "faiss_index"
+
+    if not os.path.exists(index_dir):
+        with st.spinner("No FAISS index found. Creating one from /docs..."):
+            loader = PyPDFDirectoryLoader("docs")
+            documents = loader.load()
+            splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+            split_docs = splitter.split_documents(documents)
+            db = FAISS.from_documents(split_docs, embeddings)
+            db.save_local(index_dir)
+    else:
+        db = FAISS.load_local(index_dir, embeddings, allow_dangerous_deserialization=True)
+
     retriever = db.as_retriever()
     llm = ChatOpenAI(temperature=0)
     return RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
 
 qa = load_qa()
-query = st.text_input("Ask a question about Wyndham Council:")
+
+query = st.text_input("Ask about Wyndham Council policies, rules, or documents:")
 if query:
-    with st.spinner("Searching documents..."):
-        response = qa.run(query)
-    st.success("Answer:")
-    st.write(response)
+    with st.spinner("Thinking..."):
+        result = qa.run(query)
+    st.success("CivReply says:")
+    st.write(result)
