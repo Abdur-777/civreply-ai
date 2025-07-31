@@ -1,4 +1,4 @@
-# CivReply AI – Upgraded Version with Admin Login, Multi-Council Support, Stripe, and More
+# CivReply AI – Upgraded Version with Admin Login, Multi-Council Support, Stripe, and Email Reply Integration
 import os
 import streamlit as st
 from langchain.chains import RetrievalQA
@@ -7,6 +7,10 @@ from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+# Optional Gmail Integration
+from googleapiclient.discovery import build
+from google.oauth2.credentials import Credentials
 
 # Load environment variables
 load_dotenv()
