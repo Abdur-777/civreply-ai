@@ -10,7 +10,7 @@ st.title("🏛️ CivReply AI – Ask Wyndham Council Anything")
 @st.cache_resource
 def load_qa():
     embeddings = OpenAIEmbeddings()
-    db = FAISS.load_local("faiss_index", embeddings)
+    db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
     retriever = db.as_retriever()
     llm = ChatOpenAI(temperature=0)
     return RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
