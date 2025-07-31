@@ -29,7 +29,11 @@ if not st.session_state.is_admin:
         st.error("❌ Incorrect password")
 
 # --- Council Selector ---
-council = st.selectbox("Choose Council", ["Wyndham", "Brimbank", "Hobsons Bay"])
+councils = [
+    "Wyndham", "Brimbank", "Hobsons Bay", "Melbourne", "Yarra",
+    "Moreland", "Darebin", "Boroondara", "Stonnington", "Port Phillip"
+]
+council = st.selectbox("Choose Council", councils)
 council_key = council.lower().replace(" ", "_")
 index_path = f"index/{council_key}"
 
@@ -110,7 +114,7 @@ def process_and_index_pdf(uploaded_files):
         st.error(f"❌ Failed to process: {str(e)}")
 
 if st.session_state.is_admin:
-    uploaded_files = st.file_uploader("📤 Upload PDFs for this council", type="pdf", accept_multiple_files=True)
+    uploaded_files = st.file_uploader(f"📤 Upload PDFs for {council}", type="pdf", accept_multiple_files=True)
     if uploaded_files and st.button("🔄 Rebuild Index"):
         process_and_index_pdf(uploaded_files)
 
