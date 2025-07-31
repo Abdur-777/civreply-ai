@@ -1,4 +1,4 @@
-# CivReply AI – Upgraded Version with Admin Login, Multi-Council Support, Stripe, and GPT-Powered Gmail Auto-Reply
+# CivReply AI – Upgraded Version with Admin Upload, Multi-Council Support, Stripe, and Gmail Auto-Reply
 
 import os
 import streamlit as st
@@ -6,7 +6,7 @@ from langchain.chains import RetrievalQA
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import imaplib
 import email
@@ -21,7 +21,7 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "supersecret")
 GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_PASS = os.getenv("GMAIL_PASS")
 
-st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="centered")
+st.set_page_config(page_title="CivReply AI", page_icon="\U0001F3DB️", layout="centered")
 
 # --- Admin Auth ---
 if "is_admin" not in st.session_state:
@@ -43,6 +43,8 @@ councils = [
 council = st.selectbox("Choose Council", councils)
 council_key = council.lower().replace(" ", "_")
 index_path = f"index/{council_key}"
+data_path = f"data/{council_key}"
+os.makedirs(data_path, exist_ok=True)
 
 # --- Branding ---
 st.markdown(f"""
@@ -56,12 +58,12 @@ st.markdown(f"""
   .footer {{ text-align: center; font-size: 0.85rem; color: #6b7280; margin-top: 30px; }}
 </style>
 <div class="header">
-  <div style="font-size: 2rem;">🏛️</div>
+  <div style="font-size: 2rem;">\U0001F3DB️</div>
   <h1>CivReply AI</h1>
 </div>
 <div class="tagline">Ask {council} Council anything – policies, laws, documents.</div>
-<div class="user-info-bar">🧑 Council: {council} | 🔐 Role: {'Admin' if st.session_state.is_admin else 'Guest'}</div>
-<div class="plan-box">📦 Plan: Basic – 500 queries/month | 1 user | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
+<div class="user-info-bar">\U0001F9D1 Council: {council} | 🔐 Role: {'Admin' if st.session_state.is_admin else 'Guest'}</div>
+<div class="plan-box">\U0001F4E6 Plan: Basic – 500 queries/month | 1 user | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
 <div class="question-label">🔍 Ask a local question:</div>
 """, unsafe_allow_html=True)
 
@@ -98,32 +100,30 @@ if question:
         st.error(f"❌ Error: {str(e)}")
 
 # --- PDF Upload + FAISS Rebuild ---
-def process_and_index_pdf(uploaded_files):
-    try:
-        all_docs = []
-        for file in uploaded_files:
-            with open("temp.pdf", "wb") as f:
-                f.write(file.read())
-            loader = PyPDFLoader("temp.pdf")
-            all_docs.extend(loader.load())
-
-        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        split_docs = splitter.split_documents(all_docs)
-
-        embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
-        faiss_index = FAISS.from_documents(split_docs, embeddings)
-        faiss_index.save_local(index_path)
-
-        st.success(f"✅ Index for {council} updated with {len(uploaded_files)} file(s).")
-        st.experimental_rerun()
-
-    except Exception as e:
-        st.error(f"❌ Failed to process: {str(e)}")
+def process_and_index_directory(data_dir):
+    loader = PyPDFDirectoryLoader(data_dir)
+    docs = loader.load()
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    split_docs = splitter.split_documents(docs)
+    embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+    faiss_index = FAISS.from_documents(split_docs, embeddings)
+    faiss_index.save_local(index_path)
 
 if st.session_state.is_admin:
     uploaded_files = st.file_uploader(f"📤 Upload PDFs for {council}", type="pdf", accept_multiple_files=True)
-    if uploaded_files and st.button("🔄 Rebuild Index"):
-        process_and_index_pdf(uploaded_files)
+    if uploaded_files:
+        for file in uploaded_files:
+            with open(os.path.join(data_path, file.name), "wb") as f:
+                f.write(file.getbuffer())
+        st.success("✅ Files uploaded. Now click below to rebuild the index.")
+
+    if st.button("🔄 Rebuild Index"):
+        try:
+            process_and_index_directory(data_path)
+            st.success(f"✅ Index for {council} rebuilt.")
+            st.experimental_rerun()
+        except Exception as e:
+            st.error(f"❌ Failed to rebuild index: {str(e)}")
 
 # --- Gmail Auto-Reply with GPT ---
 def gmail_auto_reply():
@@ -173,6 +173,6 @@ if st.session_state.is_admin and st.button("📬 Auto-Reply to Council Emails"):
 st.markdown(f"""
 <div class="footer">
   ⚙️ Powered by LangChain + GPT-4 | Queries used: {st.session_state.query_count} / 500<br>
-  📬 Contact: <a href="mailto:contact@civreply.ai">contact@civreply.ai</a>
+  📬 Contact: <a href=\"mailto:contact@civreply.ai\">contact@civreply.ai</a>
 </div>
 """, unsafe_allow_html=True)
