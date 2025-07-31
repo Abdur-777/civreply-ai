@@ -16,6 +16,7 @@ def load_qa():
 
     if not os.path.exists(index_dir):
         with st.spinner("No FAISS index found. Creating one from /docs..."):
+            print("📂 Files Render sees in /docs:", os.listdir("docs"))  # 👈 LOG LINE HERE
             loader = PyPDFDirectoryLoader("docs")
             documents = loader.load()
 
