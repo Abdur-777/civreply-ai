@@ -1,107 +1,145 @@
 import streamlit as st
-import os
-import base64
-from langchain.chains import RetrievalQA
-from langchain_community.vectorstores import FAISS
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFDirectoryLoader
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from datetime import datetime
 
-# === STREAMLIT CONFIG ===
-st.set_page_config(page_title="CivReply AI", page_icon="\U0001F3DB\uFE0F", layout="centered")
+# Page settings
+st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="centered")
 
-# === HEADER ===
+# HTML/CSS Styling + UI Elements
 st.markdown("""
-    <h1 style='text-align: center;'>\U0001F3DB\uFE0F CivReply AI</h1>
-    <p style='text-align: center; font-size: 1.2rem;'>Ask Wyndham Council anything – policies, laws, documents.</p>
-    <hr>
+<style>
+  body {
+    font-family: 'Segoe UI', sans-serif;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .header h1 {
+    font-size: 2.5rem;
+    margin: 0;
+  }
+
+  .tagline {
+    text-align: center;
+    font-size: 1.1rem;
+    color: #555;
+    margin-bottom: 20px;
+  }
+
+  .user-info-bar {
+    background-color: #f0f2f6;
+    padding: 10px 15px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    color: #333;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .user-info-bar span {
+    font-weight: 500;
+  }
+
+  .plan-box {
+    background-color: #eef6ff;
+    padding: 12px 15px;
+    border-radius: 10px;
+    margin: 10px 0 30px;
+    font-size: 0.9rem;
+    color: #1d4ed8;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .plan-box a {
+    text-decoration: none;
+    background-color: #1d4ed8;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+  }
+
+  .question-box {
+    background-color: #f9fafb;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    padding: 16px;
+    font-size: 1rem;
+    color: #111827;
+    width: 100%;
+  }
+
+  .question-label {
+    font-size: 1rem;
+    margin-bottom: 6px;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .upload-note {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-top: -6px;
+    margin-bottom: 18px;
+  }
+
+  .footer {
+    text-align: center;
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-top: 30px;
+  }
+</style>
+
+<div class="header">
+  <div style="font-size: 2rem;">🏛️</div>
+  <h1>CivReply AI</h1>
+</div>
+
+<div class="tagline">
+  Ask Wyndham Council anything – policies, laws, documents.
+</div>
+
+<div class="user-info-bar">
+  <div><span>🧑 Council:</span> Wyndham</div>
+  <div><span>🔐 Role:</span> Admin</div>
+</div>
+
+<div class="plan-box">
+  <div>📦 <strong>Plan:</strong> Basic – 500 queries/month | 1 user</div>
+  <a href="#">Upgrade →</a>
+</div>
+
+<div class="question-label">🔍 Ask about a local policy or form</div>
 """, unsafe_allow_html=True)
 
-# === DARK MODE TOGGLE ===
-dark_mode = st.toggle("🌙 Dark Mode")
-if dark_mode:
-    st.markdown("""<style>body { background-color: #111; color: white; }</style>""", unsafe_allow_html=True)
+# Input field
+question = st.text_input("e.g. Do I need a permit to cut down a tree?", key="question_box", label_visibility="collapsed")
 
-# === PDF UPLOADER ===
-with st.expander("📤 Upload new Wyndham PDFs (Admin only)"):
-    uploaded_files = st.file_uploader("Add new council documents (PDFs only):", type="pdf", accept_multiple_files=True)
-    if uploaded_files:
-        os.makedirs("docs", exist_ok=True)
-        for uploaded_file in uploaded_files:
-            file_path = os.path.join("docs", uploaded_file.name)
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-        st.success("✅ Files added! Re-run app to re-index.")
+# Query response logic placeholder
+if question:
+    st.write("🔎 Searching Wyndham Council documents...")
+    # Replace this with your LangChain logic:
+    # answer = qa_chain.run(question)
+    # st.success(answer)
 
-# === LOAD Q&A CHAIN ===
-@st.cache_resource
-def load_qa():
-    embeddings = OpenAIEmbeddings()
-    index_dir = "faiss_index"
-
-    if not os.path.exists(index_dir):
-        with st.spinner("🔄 Indexing Wyndham documents..."):
-            loader = PyPDFDirectoryLoader("docs")
-            documents = loader.load()
-
-            if not documents:
-                st.error("❌ No documents found in /docs.")
-                st.stop()
-
-            splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-            split_docs = splitter.split_documents(documents)
-
-            if not split_docs:
-                st.error("❌ PDFs appear empty or scanned.")
-                st.stop()
-
-            db = FAISS.from_documents(split_docs, embeddings)
-            db.save_local(index_dir)
-    else:
-        db = FAISS.load_local(index_dir, embeddings, allow_dangerous_deserialization=True)
-
-    retriever = db.as_retriever(search_type="similarity", search_kwargs={"k": 3})
-    llm = ChatOpenAI(temperature=0)
-    return RetrievalQA.from_chain_type(llm=llm, retriever=retriever, return_source_documents=True)
-
-qa_chain = load_qa()
-
-# === ASK + RESPONSE ===
-st.markdown("---")
-query = st.text_input("🔍 Ask a question:", placeholder="e.g. How do I register a food premises?")
-session = st.session_state.setdefault("history", [])
-
-if query:
-    with st.spinner("🧠 CivReply is thinking..."):
-        response = qa_chain(query)
-        answer = response['result']
-        sources = response.get("source_documents", [])
-
-        st.markdown("""
-            <div style="background-color:#e8f5e9; padding: 1rem; border-radius: 0.5rem;">
-                <strong>CivReply says:</strong><br>{}</div>
-        """.format(answer), unsafe_allow_html=True)
-
-        if sources:
-            st.markdown("""<small><b>📄 Sources:</b></small>""", unsafe_allow_html=True)
-            for src in sources:
-                fname = os.path.basename(src.metadata.get("source", "Unknown PDF"))
-                page = src.metadata.get("page", "?")
-                st.markdown(f"- `{fname}`, page {page}")
-
-        session.append({"q": query, "a": answer})
-
-# === HISTORY ===
-if session:
-    with st.expander("🕘 Q&A History"):
-        for i, item in enumerate(session[::-1]):
-            st.markdown(f"**Q{i+1}:** {item['q']}")
-            st.markdown(f"*A:* {item['a']}")
-            st.markdown("---")
-
-# === FOOTER ===
+# Upload note + Footer
 st.markdown("""
-    <hr>
-    <p style='font-size: 0.9rem; color: gray;'>⚙️ Powered by LangChain + OpenAI | Contact: <a href='mailto:wyndham@vic.gov.au'>wyndham@vic.gov.au</a></p>
+<div class="upload-note">
+  🔒 Upload new Wyndham PDFs (Admin only) – Only verified admins can upload documents.
+</div>
+
+<div class="footer">
+  ⚙️ Powered by LangChain + OpenAI |
+  Contact: <a href="mailto:wyndham@vic.gov.au">wyndham@vic.gov.au</a>
+</div>
 """, unsafe_allow_html=True)
