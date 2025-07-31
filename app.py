@@ -1,4 +1,4 @@
-# CivReply AI – Upgraded Version with Admin Login, Multi-Council Support, Stripe, and Email Reply Integration
+# CivReply AI – Upgraded Version with Admin Login, Multi-Council Support, Stripe, and Gmail Auto-Reply
 import os
 import streamlit as st
 from langchain.chains import RetrievalQA
@@ -7,16 +7,20 @@ from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-
-# Optional Gmail Integration
-from googleapiclient.discovery import build
-from google.oauth2.credentials import Credentials
+import base64
+import imaplib
+import email
+import smtplib
+from email.mime.text import MIMEText
+from openai import OpenAI
 
 # Load environment variables
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 STRIPE_LINK = os.getenv("STRIPE_LINK", "https://buy.stripe.com/test_xxx")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "supersecret")
+GMAIL_USER = os.getenv("GMAIL_USER")
+GMAIL_PASS = os.getenv("GMAIL_PASS")
 
 st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="centered")
 
@@ -121,6 +125,50 @@ if st.session_state.is_admin:
     uploaded_files = st.file_uploader(f"📤 Upload PDFs for {council}", type="pdf", accept_multiple_files=True)
     if uploaded_files and st.button("🔄 Rebuild Index"):
         process_and_index_pdf(uploaded_files)
+
+# --- Gmail Auto-Reply ---
+def gmail_auto_reply():
+    try:
+        imap = imaplib.IMAP4_SSL("imap.gmail.com")
+        imap.login(GMAIL_USER, GMAIL_PASS)
+        imap.select("inbox")
+        status, messages = imap.search(None, 'UNSEEN')
+
+        for num in messages[0].split():
+            _, data = imap.fetch(num, "(RFC822)")
+            raw_email = data[0][1]
+            msg = email.message_from_bytes(raw_email)
+            sender = email.utils.parseaddr(msg['From'])[1]
+            subject = msg['Subject']
+            body = ""
+            if msg.is_multipart():
+                for part in msg.walk():
+                    if part.get_content_type() == "text/plain":
+                        body = part.get_payload(decode=True).decode()
+                        break
+            else:
+                body = msg.get_payload(decode=True).decode()
+
+            prompt = f"You are an AI assistant replying to a council inquiry email. The email says: '{body}'. Write a professional and helpful reply."
+            reply = ChatOpenAI(model="gpt-4", openai_api_key=OPENAI_API_KEY).invoke(prompt)
+
+            reply_msg = MIMEText(reply)
+            reply_msg["Subject"] = f"Re: {subject}"
+            reply_msg["From"] = GMAIL_USER
+            reply_msg["To"] = sender
+
+            smtp = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+            smtp.login(GMAIL_USER, GMAIL_PASS)
+            smtp.sendmail(GMAIL_USER, sender, reply_msg.as_string())
+            smtp.quit()
+
+        imap.logout()
+        st.success("✅ Auto-replied to all unread emails.")
+    except Exception as e:
+        st.error(f"❌ Gmail auto-reply failed: {str(e)}")
+
+if st.session_state.is_admin and st.button("📬 Auto-Reply to Council Emails"):
+    gmail_auto_reply()
 
 # --- Footer ---
 st.markdown(f"""
