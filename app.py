@@ -4,6 +4,8 @@ from langchain.chains import RetrievalQA
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 # Load API key
 load_dotenv()
@@ -160,10 +162,34 @@ if question:
     except Exception as e:
         st.error("❌ Error processing your question. Check OpenAI key or vector DB.")
 
-# ---- Admin Upload Placeholder ----
+# ---- PDF Upload + Live Index Rebuild ----
+def process_and_index_pdf(uploaded_file):
+    try:
+        with open("temp_uploaded.pdf", "wb") as f:
+            f.write(uploaded_file.read())
+
+        loader = PyPDFLoader("temp_uploaded.pdf")
+        documents = loader.load()
+
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        split_docs = text_splitter.split_documents(documents)
+
+        embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+        faiss_index = FAISS.from_documents(split_docs, embeddings)
+
+        faiss_index.save_local("index/wyndham")
+
+        st.success("✅ Document uploaded and FAISS index updated.")
+        st.experimental_rerun()
+
+    except Exception as e:
+        st.error(f"❌ Failed to process document: {str(e)}")
+
 uploaded_file = st.file_uploader("Upload new Wyndham PDFs (Admin only)", type="pdf")
 if uploaded_file:
-    st.warning("📥 Upload feature is admin-only and currently not connected to retraining logic.")
+    st.info("📄 Uploaded file received. Click below to index it.")
+    if st.button("🔄 Rebuild Search Index"):
+        process_and_index_pdf(uploaded_file)
 
 # ---- Footer ----
 st.markdown(f"""
