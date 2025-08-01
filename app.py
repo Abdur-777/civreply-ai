@@ -6,12 +6,10 @@ from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-import imaplib
-import email
 import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 import json
 import shutil
 
@@ -27,16 +25,16 @@ GMAIL_PASS = os.getenv("GMAIL_PASS")
 with open("council_config.json") as f:
     COUNCIL_CONFIG = json.load(f)
 
-# Extract council from URL or default
+# --- Extract URL parameters ---
 query_params = st.query_params
 council_key = query_params.get("council", ["wyndham"])[0].lower().replace(" ", "_")
 council = council_key.title().replace("_", " ")
 config = COUNCIL_CONFIG.get(council_key, {})
 
-# Page setup
-st.set_page_config(page_title=f"CivReply AI - {council}", page_icon="\U0001F3DB️", layout="wide")
-
-# --- State Management ---
+# --- Session state ---
+st.set_page_config(page_title=f"CivReply AI – {council}", page_icon="🏛️", layout="wide")
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 if "query_count" not in st.session_state:
     st.session_state.query_count = {}
 if council_key not in st.session_state.query_count:
@@ -49,84 +47,50 @@ if "feedback" not in st.session_state:
     st.session_state.feedback = {}
 if council_key not in st.session_state.feedback:
     st.session_state.feedback[council_key] = []
-if "history" not in st.session_state:
-    st.session_state.history = {}
-if council_key not in st.session_state.history:
-    st.session_state.history[council_key] = []
 if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
-if "user_auth" not in st.session_state:
-    st.session_state.user_auth = False
 
-# --- Layout Columns ---
-left, center, right = st.columns([1, 2, 1])
+# --- Sidebar Chat History ---
+st.sidebar.title("🧾 Chat History")
+st.sidebar.button("+ New Chat", on_click=lambda: st.session_state.chat_history.clear())
+for i, item in enumerate(reversed(st.session_state.chat_history)):
+    st.sidebar.markdown(f"{item['time'][:16]}: **{item['question'][:30]}...**")
 
-# --- Admin Access ---
-with left.expander("🔐 Admin Login"):
+# --- Admin Panel ---
+with st.sidebar.expander("🔐 Admin Login"):
     if not st.session_state.is_admin:
-        admin_input = st.text_input("Enter Admin Password", type="password")
-        if admin_input == ADMIN_PASSWORD:
+        if st.text_input("Admin Password", type="password") == ADMIN_PASSWORD:
             st.session_state.is_admin = True
-            st.success("✅ Admin access granted.")
-        elif admin_input:
-            st.error("❌ Incorrect password")
+            st.success("✅ Admin access granted")
 
-# --- User Login ---
-with left.expander("👤 Council User Login"):
-    if not st.session_state.user_auth:
-        email_input = st.text_input("Enter your work email")
-        if st.button("Login"):
-            if email_input.endswith(f"@{council_key}.gov.au"):
-                st.session_state.user_auth = True
-                st.success("✅ Logged in as council user")
-            else:
-                st.error("❌ Invalid email domain for council")
-
-# --- Upload Interface for Admins ---
 if st.session_state.is_admin:
-    with left:
-        st.markdown("### 📤 Upload Council PDFs")
-        uploaded_files = st.file_uploader("Upload PDFs", type=["pdf"], accept_multiple_files=True)
-        if uploaded_files:
-            save_dir = f"docs/{council_key}"
-            index_dir = f"index/{council_key}"
-            os.makedirs(save_dir, exist_ok=True)
+    st.sidebar.markdown("### 📤 Upload Council PDFs")
+    uploaded_files = st.sidebar.file_uploader("Upload PDFs", type=["pdf"], accept_multiple_files=True)
+    if uploaded_files:
+        save_dir = f"docs/{council_key}"
+        index_dir = f"index/{council_key}"
+        os.makedirs(save_dir, exist_ok=True)
+        for f in os.listdir(save_dir): os.remove(os.path.join(save_dir, f))
+        if os.path.exists(index_dir): shutil.rmtree(index_dir)
+        for file in uploaded_files:
+            with open(os.path.join(save_dir, file.name), "wb") as f:
+                f.write(file.getbuffer())
+        loader = PyPDFDirectoryLoader(save_dir)
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        split_docs = text_splitter.split_documents(loader.load())
+        db = FAISS.from_documents(split_docs, OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY))
+        db.save_local(index_dir)
+        st.sidebar.success(f"✅ Uploaded and indexed {len(uploaded_files)} PDF(s)")
 
-            for f in os.listdir(save_dir):
-                os.remove(os.path.join(save_dir, f))
-            if os.path.exists(index_dir):
-                shutil.rmtree(index_dir)
-
-            for file in uploaded_files:
-                with open(os.path.join(save_dir, file.name), "wb") as f:
-                    f.write(file.getbuffer())
-
-            loader = PyPDFDirectoryLoader(save_dir)
-            docs = loader.load()
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-            split_docs = text_splitter.split_documents(docs)
-            embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
-            db = FAISS.from_documents(split_docs, embeddings)
-            db.save_local(index_dir)
-
-            st.success(f"✅ Uploaded and indexed {len(uploaded_files)} file(s) for {council}")
-
-            st.markdown("### 🗂️ Uploaded Files")
-            for filename in os.listdir(save_dir):
-                st.write(filename)
-                if st.button(f"🗑 Delete {filename}", key=f"delete_{filename}"):
-                    os.remove(os.path.join(save_dir, filename))
-                    st.success(f"Deleted {filename}")
-
-# --- Email Sending ---
+# --- Email Sender ---
 def send_auto_email(recipient, question, answer):
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
     msg = MIMEText(f"""
     <html><body>
-      <h3 style='color:#3b82f6;'>Your CivReply AI Answer</h3>
+      <h3>Your CivReply AI Answer</h3>
       <p><strong>Question:</strong> {question}</p>
       <p><strong>Answer:</strong><br>{answer}</p>
-      <p style='color:#6b7280;'>Sent at {now} from CivReply AI</p>
+      <p style='font-size:12px;color:#888;'>Sent {now}</p>
     </body></html>
     """, "html")
     msg["Subject"] = f"CivReply Answer: {question[:50]}"
@@ -142,77 +106,59 @@ def send_auto_email(recipient, question, answer):
         st.error(f"Failed to send email: {e}")
         return False
 
-# --- Title + Branding ---
-with center:
-    st.markdown(f"""
-        <div style='text-align:center'>
-          <h1>🏛 CivReply AI – {council}</h1>
-          <img src="{config.get('hero_image')}" width="200" />
-          <p><em>{config.get('tagline')}</em></p>
-        </div>
-    """, unsafe_allow_html=True)
+# --- Feedback Handler ---
+def record_feedback(rating, notes=""):
+    st.session_state.feedback[council_key].append({
+        "time": datetime.now().isoformat(),
+        "rating": rating,
+        "notes": notes
+    })
+    st.success("✅ Feedback submitted")
 
-    plan = config.get("plan", "basic")
-    limits = {
-        "basic": {"queries": 500, "users": 1},
-        "standard": {"queries": 2000, "users": 5},
-        "enterprise": {"queries": float("inf"), "users": 20},
-    }[plan]
+# --- Chat Display ---
+st.markdown(f"""
+    <style>
+    .chat-bubble {{
+      max-width: 80%; padding: 10px 15px; border-radius: 15px; margin-bottom: 10px;
+    }}
+    .user {{ background: #d1fae5; align-self: flex-end; margin-left:auto; }}
+    .bot {{ background: #e0e7ff; align-self: flex-start; margin-right:auto; }}
+    .chat-container {{ display: flex; flex-direction: column; gap: 10px; }}
+    </style>
+    <div style='text-align:center'>
+      <h1>🏛️ CivReply AI – {council}</h1>
+      <p><em>{config.get('tagline', 'Empowering local answers.')}</em></p>
+    </div>
+""", unsafe_allow_html=True)
 
-    st.markdown(f"""
-        <div style='background:#f1f5f9; padding:10px; border-left: 5px solid #3b82f6;'>
-        💼 Plan: <strong>{plan.capitalize()}</strong> | {limits['queries']} queries/mo | {limits['users']} seats
-        </div>
-    """, unsafe_allow_html=True)
+# --- Plan Info ---
+plan = config.get("plan", "basic")
+limits = {"basic": {"queries": 500}, "standard": {"queries": 2000}, "enterprise": {"queries": float("inf")}}[plan]
+st.markdown(f"**💼 Plan: {plan.capitalize()}** | {limits['queries']} queries/mo")
 
-    st.info(config.get("about", "This council uses CivReply AI to assist residents with smarter answers."))
+# --- Chat Input + History ---
+st.markdown("<div class='chat-container'>", unsafe_allow_html=True)
+for item in st.session_state.chat_history:
+    st.markdown(f"<div class='chat-bubble user'>{item['question']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='chat-bubble bot'>{item['answer']}</div>", unsafe_allow_html=True)
+    with st.expander("💬 Feedback for this response"):
+        emoji = st.radio("Rate this response:", ["👍", "👎", "😐"], key=f"rate_{item['time']}")
+        note = st.text_area("Optional comment", key=f"note_{item['time']}")
+        if st.button("Submit Feedback", key=f"btn_{item['time']}"):
+            record_feedback(emoji, note)
+st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("### 🔍 Ask a local question:")
-    user_question = st.text_input("Your question", placeholder="e.g., What day is bin collection?")
-    user_email = st.text_input("Your email (optional)", placeholder="your@email.com")
-
-    if user_question:
-        if st.session_state.query_count[council_key] < limits["queries"]:
-            st.session_state.query_count[council_key] += 1
-            llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY)
-            index_path = f"index/{council_key}/index.faiss"
-            retriever = FAISS.load_local(index_path, OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)).as_retriever()
-            qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
-            answer = qa_chain.run(user_question)
-            st.markdown(f"**Answer:** {answer}")
-
-            st.session_state.history[council_key].append({"question": user_question, "answer": answer})
-
-            if user_email:
-                if send_auto_email(user_email, user_question, answer):
-                    st.success("✅ Answer sent to your email.")
-
-            st.markdown("### 🙋 Feedback")
-            feedback = st.radio("Was this helpful?", ["⭐️⭐️⭐️⭐️⭐️", "⭐️⭐️⭐️⭐️", "⭐️⭐️⭐️", "⭐️⭐️", "⭐️"], key=f"fb_{st.session_state.query_count[council_key]}")
-            comment = st.text_input("Any notes?", key=f"note_{st.session_state.query_count[council_key]}")
-            if st.button("Submit Feedback"):
-                st.session_state.feedback[council_key].append({
-                    "question": user_question,
-                    "answer": answer,
-                    "feedback": feedback,
-                    "comment": comment,
-                    "time": datetime.now().isoformat()
-                })
-                st.success("🙏 Thanks for your feedback!")
-        else:
-            st.error("You’ve reached the max query limit for this council’s plan.")
-
-# --- Sidebar History ---
-with right:
-    st.markdown("### 🕘 Past Conversations")
-    for item in reversed(st.session_state.history[council_key][-10:]):
-        st.markdown(f"- **Q:** {item['question']}\n\n  **A:** {item['answer']}")
-
-    if st.session_state.get("is_admin"):
-        st.markdown("### 📬 Email Log")
-        for log in st.session_state.email_log[council_key]:
-            st.markdown(f"- [{log['time']}] Sent to {log['to']} | Q: _{log['question']}_")
-
-        st.markdown("### 📣 Feedback Log")
-        for item in st.session_state.feedback[council_key]:
-            st.markdown(f"- [{item['time']}] {item['feedback']} | Q: _{item['question']}_ | {item['comment']}")
+question = st.chat_input("Ask a local question")
+user_email = st.text_input("Email for response (optional)")
+if question and st.session_state.query_count[council_key] < limits['queries']:
+    st.session_state.query_count[council_key] += 1
+    llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY)
+    retriever = FAISS.load_local(f"index/{council_key}/index.faiss", OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)).as_retriever()
+    answer = RetrievalQA.from_chain_type(llm=llm, retriever=retriever).run(question)
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    st.session_state.chat_history.append({"question": question, "answer": answer, "time": now})
+    if user_email:
+        send_auto_email(user_email, question, answer)
+    st.rerun()
+elif question:
+    st.error("Query limit reached for this plan.")
