@@ -1,5 +1,5 @@
-# [EXTENDED CivReply AI Streamlit App – Version 2.2 – Tiered Plans + Auto-Reply Enhancements]
-# Enhancements: Tier limits, Basic/Standard/Enterprise features, auto-reply header, upgrade prompts
+# [EXTENDED CivReply AI Streamlit App – Version 2.3 – Role Refinement + Sidebar Threads + Tier UI]
+# Updates: Removed 'Business Owner' role, added ChatGPT-style sidebar chat history, and tier card display
 
 import streamlit as st
 import os
@@ -21,11 +21,10 @@ st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="wide")
 
 # === SETTINGS ===
 COUNCILS = ["Wyndham"]
-LANGUAGES = {"English": "en"}
 PLAN_CONFIG = {
-    "basic": {"limit": 500, "label": "Basic ($499/mo)"},
-    "standard": {"limit": 2000, "label": "Standard ($1499/mo)"},
-    "enterprise": {"limit": float("inf"), "label": "Enterprise ($2999+/mo)"}
+    "basic": {"limit": 500, "label": "Basic ($499/mo)", "features": ["PDF Q&A"]},
+    "standard": {"limit": 2000, "label": "Standard ($1499/mo)", "features": ["PDF Q&A", "Form Scraping"]},
+    "enterprise": {"limit": float("inf"), "label": "Enterprise ($2999+/mo)", "features": ["All Features"]}
 }
 
 # === ENV VAR CHECK ===
@@ -54,9 +53,7 @@ st.markdown(f"""
 # === INPUT CONTROLS ===
 cols = st.columns(2)
 with cols[0]:
-    language = st.selectbox("🌐 Language", list(LANGUAGES.keys()))
-with cols[1]:
-    st.session_state.user_role = st.selectbox("🧑 Role", ["Resident", "Business Owner", "Staff", "Visitor"])
+    st.session_state.user_role = st.selectbox("🧑 Role", ["Resident", "Staff", "Visitor"])
 
 # === SIDEBAR ===
 with st.sidebar:
@@ -71,6 +68,28 @@ with st.sidebar:
         "💡 Share Feedback",
         "📞 Contact Us",
         "⚙️ Admin Panel"])
+
+    if st.session_state.chat_history:
+        st.markdown("---")
+        st.markdown("### 🧠 Recent Q&A")
+        for i, (q, a) in enumerate(st.session_state.chat_history[::-1][:5]):
+            if st.button(f"Q: {q[:40]}...", key=f"history_{i}"):
+                st.session_state.chat_input = q
+
+# === PLAN CARD DISPLAY ===
+st.markdown("### 💼 Plan Comparison")
+cols = st.columns(3)
+for i, tier in enumerate(["basic", "standard", "enterprise"]):
+    with cols[i]:
+        st.markdown(f"""
+        <div style='border:1px solid #ddd;padding:1rem;border-radius:10px;'>
+            <h4>{PLAN_CONFIG[tier]['label']}</h4>
+            <ul>
+                {''.join([f'<li>{feat}</li>' for feat in PLAN_CONFIG[tier]['features']])}
+            </ul>
+            <p><strong>Limit:</strong> {PLAN_CONFIG[tier]['limit'] if PLAN_CONFIG[tier]['limit'] != float('inf') else 'Unlimited'} queries</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 # === FUNCTIONS ===
 def ask_ai(question, council):
@@ -98,17 +117,17 @@ def log_feedback(text, email):
         f.write(f"{datetime.now().isoformat()} | {email or 'anon'} | {text}\n")
 
 # === QUERY LIMIT CHECK ===
-current_plan = st.session_state.plan
-plan_limit = PLAN_CONFIG[current_plan]['limit']
+plan_id = st.session_state.plan
+plan_limit = PLAN_CONFIG[plan_id]['limit']
 
 if st.session_state.query_count >= plan_limit:
-    st.warning(f"❗ You’ve reached the {PLAN_CONFIG[current_plan]['label']} plan limit.")
+    st.warning(f"❗ You’ve reached the {PLAN_CONFIG[plan_id]['label']} limit.")
     st.stop()
 
 # === MAIN ROUTER ===
 if nav == "💬 Chat with Council AI":
-    st.subheader(f"💬 Ask Wyndham Council")
-    user_input = st.chat_input("Type your question here...")
+    st.subheader("💬 Ask Wyndham Council")
+    user_input = st.chat_input("Ask a question about Wyndham policies, forms, or documents…")
     if user_input:
         st.session_state.query_count += 1
         with st.chat_message("user"):
@@ -118,13 +137,6 @@ if nav == "💬 Chat with Council AI":
             with st.chat_message("ai"):
                 st.markdown(f"📩 **Auto-response from Wyndham Council:**\n\n{ai_reply}")
             st.session_state.chat_history.append((user_input, ai_reply))
-
-    if st.session_state.chat_history:
-        with st.expander("🧠 View Previous Questions"):
-            for q, a in st.session_state.chat_history[::-1][:5]:
-                st.markdown(f"**Q:** {q}")
-                st.markdown(f"**A:** {a}")
-                st.markdown("---")
 
 elif nav == "🧾 Topic FAQs":
     st.subheader("FAQs by Topic")
