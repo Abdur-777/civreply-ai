@@ -116,13 +116,7 @@ council_landing_config = {
         "hero_image": "https://upload.wikimedia.org/wikipedia/en/b/bc/City_of_Port_Phillip_logo.png",
         "about": "Find what you need about permits, parking, and arts programs across Port Phillip."
     }
-},
-    "melbourne": {
-        "tagline": "Your personal assistant for City of Melbourne policies.",
-        "hero_image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/City_of_Melbourne_logo.svg/2560px-City_of_Melbourne_logo.svg.png",
-        "about": "Discover services, permits, and events across central Melbourne—instantly."
-    },
-    # Add more as needed
+}
 }
 
 config = council_landing_config.get(council_key, {})
