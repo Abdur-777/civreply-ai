@@ -1,0 +1,62 @@
+{
+  "wyndham": {
+    "tagline": "Empowering Wyndham residents with smarter answers.",
+    "hero_image": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Wyndham_City_logo.png",
+    "about": "Wyndham Council provides planning, permits, bins, and more. CivReply AI helps you navigate them effortlessly.",
+    "plan": "basic"
+  },
+  "brimbank": {
+    "tagline": "Smarter service for Brimbank locals.",
+    "hero_image": "https://upload.wikimedia.org/wikipedia/en/3/3f/Brimbank_City_Council_Logo.png",
+    "about": "Brimbank Council covers waste, development, local laws, and more.",
+    "plan": "standard"
+  },
+  "darebin": {
+    "tagline": "Instant answers for Darebin’s thriving community.",
+    "hero_image": "https://upload.wikimedia.org/wikipedia/en/5/54/City_of_Darebin_Logo.png",
+    "about": "Covering Preston, Northcote and beyond—Darebin Council now runs on AI.",
+    "plan": "basic"
+  },
+  "moonee_valley": {
+    "tagline": "Modern help for Moonee Valley queries.",
+    "hero_image": "https://upload.wikimedia.org/wikipedia/en/0/0f/Moonee_Valley_City_Council_Logo.png",
+    "about": "Permits, pets, and planning—get your Moonee Valley questions answered.",
+    "plan": "standard"
+  },
+  "melton": {
+    "tagline": "Melton City Council—now AI-powered.",
+    "hero_image": "https://upload.wikimedia.org/wikipedia/en/4/4c/Melton_City_Council_Logo.png",
+    "about": "Supporting growth with smarter services for residents and businesses.",
+    "plan": "enterprise"
+  },
+  "hobsons_bay": {
+    "tagline": "Serving Williamstown, Altona, and all of Hobsons Bay.",
+    "hero_image": "https://upload.wikimedia.org/wikipedia/en/b/bf/Hobsons_Bay_City_Council_logo.png",
+    "about": "Your go-to AI assistant for waste, permits, and local support.",
+    "plan": "standard"
+  },
+  "maribyrnong": {
+    "tagline": "Footscray’s council, powered by AI.",
+    "hero_image": "https://upload.wikimedia.org/wikipedia/en/3/3d/Maribyrnong_City_Council_Logo.png",
+    "about": "Get instant help with local council services across Maribyrnong.",
+    "plan": "basic"
+  },
+  "banyule": {
+    "tagline": "From Greensborough to Heidelberg—Banyule now runs smarter.",
+    "hero_image": "https://upload.wikimedia.org/wikipedia/en/b/b5/Banyule_City_Council_Logo.png",
+    "about": "AI-powered answers for everything from parks to permits.",
+    "plan": "standard"
+  },
+  "moreland": {
+    "tagline": "Making Merri-bek (Moreland) services easy to access.",
+    "hero_image": "https://upload.wikimedia.org/wikipedia/en/f/f1/Merri-bek_City_Council_Logo.png",
+    "about": "Your AI assistant for all things Moreland Council.",
+    "plan": "enterprise"
+  },
+  "knox": {
+    "tagline": "Fast answers for Knox City residents.",
+    "hero_image": "https://upload.wikimedia.org/wikipedia/en/8/86/Knox_City_Council_Logo.png",
+    "about": "Find info on waste, pets, rates, and more instantly.",
+    "plan": "basic"
+  }
+}
