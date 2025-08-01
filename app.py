@@ -1,5 +1,5 @@
-# [EXTENDED CivReply AI Streamlit App – Version 2.1 – Upgraded]
-# Includes: Multi-council support, user roles, OpenAI key validation, error handling, reindexing, logging, usage limits, and more.
+# [EXTENDED CivReply AI Streamlit App – Version 2.2 – Tiered Plans + Auto-Reply Enhancements]
+# Enhancements: Tier limits, Basic/Standard/Enterprise features, auto-reply header, upgrade prompts
 
 import streamlit as st
 import os
@@ -20,9 +20,13 @@ import pandas as pd
 st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="wide")
 
 # === SETTINGS ===
-COUNCILS = ["Wyndham", "Yarra", "Melbourne", "Hobsons Bay"]
-LANGUAGES = {"English": "en", "Arabic": "ar", "Mandarin": "zh", "Hindi": "hi", "Vietnamese": "vi", "Spanish": "es"}
-PLAN_CONFIG = {"basic": 500, "standard": 2000, "enterprise": float("inf")}
+COUNCILS = ["Wyndham"]
+LANGUAGES = {"English": "en"}
+PLAN_CONFIG = {
+    "basic": {"limit": 500, "label": "Basic ($499/mo)"},
+    "standard": {"limit": 2000, "label": "Standard ($1499/mo)"},
+    "enterprise": {"limit": float("inf"), "label": "Enterprise ($2999+/mo)"}
+}
 
 # === ENV VAR CHECK ===
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
@@ -43,18 +47,16 @@ st.markdown(f"""
     <div style='text-align: center;'>
         <h1>🏛️ CivReply AI</h1>
         <p>Smarter answers for smarter communities.</p>
-        <p>🧾 Active Council: <strong>{st.session_state.council}</strong></p>
+        <p>🧾 Active Council: <strong>{st.session_state.council}</strong> &nbsp;|&nbsp; 💼 Plan: <strong>{PLAN_CONFIG[st.session_state.plan]['label']}</strong></p>
     </div>
 """, unsafe_allow_html=True)
 
 # === INPUT CONTROLS ===
-cols = st.columns(3)
+cols = st.columns(2)
 with cols[0]:
     language = st.selectbox("🌐 Language", list(LANGUAGES.keys()))
 with cols[1]:
     st.session_state.user_role = st.selectbox("🧑 Role", ["Resident", "Business Owner", "Staff", "Visitor"])
-with cols[2]:
-    st.session_state.council = st.selectbox("🏙️ Select Council", COUNCILS)
 
 # === SIDEBAR ===
 with st.sidebar:
@@ -70,7 +72,7 @@ with st.sidebar:
         "📞 Contact Us",
         "⚙️ Admin Panel"])
 
-# === CORE FUNCTIONS ===
+# === FUNCTIONS ===
 def ask_ai(question, council):
     try:
         embeddings = OpenAIEmbeddings()
@@ -95,22 +97,26 @@ def log_feedback(text, email):
     with open("feedback_log.txt", "a") as f:
         f.write(f"{datetime.now().isoformat()} | {email or 'anon'} | {text}\n")
 
-# === QUERY LIMIT ===
-if st.session_state.query_count >= PLAN_CONFIG[st.session_state.plan]:
-    st.warning("❗ You’ve hit your query limit for this plan.")
+# === QUERY LIMIT CHECK ===
+current_plan = st.session_state.plan
+plan_limit = PLAN_CONFIG[current_plan]['limit']
+
+if st.session_state.query_count >= plan_limit:
+    st.warning(f"❗ You’ve reached the {PLAN_CONFIG[current_plan]['label']} plan limit.")
+    st.stop()
 
 # === MAIN ROUTER ===
 if nav == "💬 Chat with Council AI":
-    st.subheader(f"💬 Ask {st.session_state.council} Council")
+    st.subheader(f"💬 Ask Wyndham Council")
     user_input = st.chat_input("Type your question here...")
     if user_input:
         st.session_state.query_count += 1
         with st.chat_message("user"):
             st.markdown(user_input)
-        with st.spinner("Let me check that..."):
+        with st.spinner("Wyndham GPT is replying..."):
             ai_reply = ask_ai(user_input, st.session_state.council)
             with st.chat_message("ai"):
-                st.markdown(ai_reply)
+                st.markdown(f"📩 **Auto-response from Wyndham Council:**\n\n{ai_reply}")
             st.session_state.chat_history.append((user_input, ai_reply))
 
     if st.session_state.chat_history:
@@ -140,7 +146,7 @@ elif nav == "📊 Stats & Session":
     st.metric("Session Start", st.session_state.session_start)
     st.metric("Role", st.session_state.user_role)
     st.metric("Council", st.session_state.council)
-    st.metric("Plan", st.session_state.plan)
+    st.metric("Plan", PLAN_CONFIG[st.session_state.plan]['label'])
 
 elif nav == "📤 Export Logs":
     if st.button("📄 Download Session Log"):
