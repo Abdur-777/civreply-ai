@@ -1,4 +1,4 @@
-# CivReply AI – Upgraded Version with Admin Upload, Multi-Council Support, Stripe, and Gmail Auto-Reply
+# CivReply AI – Upgraded Version with Plan Handling, Admin Upload, Multi-Council Support, Stripe, and Gmail Auto-Reply
 
 import os
 import streamlit as st
@@ -23,10 +23,17 @@ GMAIL_PASS = os.getenv("GMAIL_PASS")
 
 st.set_page_config(page_title="CivReply AI", page_icon="\U0001F3DB️", layout="centered")
 
-# --- Admin Auth ---
+# --- Session State Initialization ---
 if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
 
+if "plan" not in st.session_state:
+    st.session_state.plan = "basic"  # Change to "standard" or "enterprise" as needed
+
+if "query_count" not in st.session_state:
+    st.session_state.query_count = 0
+
+# --- Admin Auth ---
 if not st.session_state.is_admin:
     password = st.text_input("Enter Admin Password to Enable Upload", type="password")
     if password == ADMIN_PASSWORD:
@@ -46,6 +53,17 @@ index_path = f"index/{council_key}"
 data_path = f"data/{council_key}"
 os.makedirs(data_path, exist_ok=True)
 
+# --- Plan Limits ---
+plan_limits = {
+    "basic": {"queries": 500, "users": 1},
+    "standard": {"queries": 2000, "users": 5},
+    "enterprise": {"queries": float("inf"), "users": 20},
+}
+
+plan_name = st.session_state.plan.capitalize()
+plan_queries = plan_limits[st.session_state.plan]["queries"]
+plan_users = plan_limits[st.session_state.plan]["users"]
+
 # --- Branding ---
 st.markdown(f"""
 <style>
@@ -63,15 +81,12 @@ st.markdown(f"""
 </div>
 <div class="tagline">Ask {council} Council anything – policies, laws, documents.</div>
 <div class="user-info-bar">\U0001F9D1 Council: {council} | 🔐 Role: {'Admin' if st.session_state.is_admin else 'Guest'}</div>
-<div class="plan-box">\U0001F4E6 Plan: Basic – 500 queries/month | 1 user | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
+<div class="plan-box">\U0001F4E6 Plan: {plan_name} – {'Unlimited' if plan_queries == float('inf') else f'{plan_queries}'} queries/month | {plan_users} user(s) | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
 <div class="question-label">🔍 Ask a local question:</div>
 """, unsafe_allow_html=True)
 
 # --- Input UI ---
 question = st.text_input("e.g. Do I need a permit to cut down a tree?", key="question_box", label_visibility="collapsed")
-
-if "query_count" not in st.session_state:
-    st.session_state.query_count = 0
 
 # --- Load Vector Index ---
 try:
@@ -88,6 +103,10 @@ except Exception as e:
 
 # --- Handle Question ---
 if question:
+    if st.session_state.query_count >= plan_queries:
+        st.error("🚫 You’ve reached your monthly query limit. Please upgrade your plan.")
+        st.stop()
+
     st.session_state.query_count += 1
     st.write("🔎 Searching documents...")
     try:
@@ -172,7 +191,7 @@ if st.session_state.is_admin and st.button("📬 Auto-Reply to Council Emails"):
 # --- Footer ---
 st.markdown(f"""
 <div class="footer">
-  ⚙️ Powered by LangChain + GPT-4 | Queries used: {st.session_state.query_count} / 500<br>
+  ⚙️ Powered by LangChain + GPT-4 | Queries used: {st.session_state.query_count} / {plan_queries if plan_queries != float('inf') else '∞'}<br>
   📬 Contact: <a href=\"mailto:contact@civreply.ai\">contact@civreply.ai</a>
 </div>
 """, unsafe_allow_html=True)
