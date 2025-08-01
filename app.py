@@ -10,7 +10,7 @@ import imaplib
 import email
 import smtplib
 from email.mime.text import MIMEText
-import json
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -20,11 +20,46 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "supersecret")
 GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_PASS = os.getenv("GMAIL_PASS")
 
-st.set_page_config(page_title="CivReply AI", page_icon="\U0001F3DB️", layout="centered")
+# Email log store
+if "email_log" not in st.session_state:
+    st.session_state.email_log = []
 
-# --- Load/Track Query Count ---
+# Query count tracker
 if "query_count" not in st.session_state:
     st.session_state.query_count = 0
+
+# Feedback store
+if "feedback" not in st.session_state:
+    st.session_state.feedback = []
+
+st.set_page_config(page_title="CivReply AI", page_icon="\U0001F3DB️", layout="centered")
+
+# --- Auto-email Response Function ---
+def send_auto_email(recipient, question, answer):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    msg = MIMEText(f"""
+    <html>
+    <body>
+      <h3 style='color:#3b82f6;'>Your CivReply AI Answer</h3>
+      <p><strong>Question:</strong> {question}</p>
+      <p><strong>Answer:</strong><br>{answer}</p>
+      <br>
+      <p style='color:#6b7280;'>Sent at {now} from CivReply AI</p>
+    </body>
+    </html>
+    """, "html")
+    msg["Subject"] = f"Your CivReply AI Answer: {question[:50]}"
+    msg["From"] = GMAIL_USER
+    msg["To"] = recipient
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_USER, GMAIL_PASS)
+            server.send_message(msg)
+        st.session_state.email_log.append({"to": recipient, "question": question, "time": now})
+        return True
+    except Exception as e:
+        st.error(f"Failed to send email: {e}")
+        return False
 
 # --- Title ---
 st.markdown("""
@@ -64,72 +99,19 @@ st.session_state.plan = plan_choice.lower()
 
 # --- Plan Setup ---
 plan_limits = {
-    "basic": {"queries": 500, "users": 1},
-    "standard": {"queries": 2000, "users": 5},
-    "enterprise": {"queries": float("inf"), "users": 20},
+    "basic": {"queries": 500, "users": 1, "email": True},
+    "standard": {"queries": 2000, "users": 5, "email": True},
+    "enterprise": {"queries": float("inf"), "users": 20, "email": True},
 }
 plan = st.session_state.plan
 plan_name = plan.capitalize()
 plan_queries = plan_limits[plan]["queries"]
 plan_users = plan_limits[plan]["users"]
 
-# --- Enforce Query Limit ---
-if st.session_state.query_count >= plan_queries:
-    st.warning("You’ve reached your plan’s query limit. Upgrade to continue.")
-    st.stop()
-
 # --- Info Bars ---
 st.markdown(f"""
 <div class="user-info-bar">🧑 Council: {council} | 🔐 Role: {'Admin' if st.session_state.get('is_admin') else 'Guest'}</div>
 <div class="plan-box">💼 Plan: {plan_name} – {'Unlimited' if plan_queries == float('inf') else f'{plan_queries}'} instant answers/month | {plan_users} seat(s) | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
-""", unsafe_allow_html=True)
-
-# --- Plan Features Display ---
-if plan == "basic":
-    st.markdown("""
-    <div style="background-color: #f9fafb; border-left: 5px solid #3b82f6; padding: 15px; border-radius: 8px; margin-top: 10px;">
-      <strong>With the Basic Plan you get:</strong>
-      <ul>
-        <li>✅ 500 AI-powered queries per month</li>
-        <li>✅ PDF policy/document lookup (no need to search manually)</li>
-        <li>✅ 24/7 availability for council-related questions</li>
-        <li>✅ 1 user seat – perfect for solo operators, reception desks, or admin officers</li>
-      </ul>
-      <em>That’s just $1 per question – and 10x faster than calling or searching council websites.</em>
-    </div>
-    """, unsafe_allow_html=True)
-
-elif plan == "standard":
-    st.markdown("""
-    <div style="background-color: #f9fafb; border-left: 5px solid #3b82f6; padding: 15px; border-radius: 8px; margin-top: 10px;">
-      <strong>With the Standard Plan you get:</strong>
-      <ul>
-        <li>✅ 2,000 AI-powered queries per month</li>
-        <li>✅ Upload custom council documents and PDFs</li>
-        <li>✅ 5 user seats – ideal for departments and offices</li>
-      </ul>
-      <em>Standard plan saves time across teams – and gives faster access to policy answers than staff alone.</em>
-    </div>
-    """, unsafe_allow_html=True)
-
-elif plan == "enterprise":
-    st.markdown("""
-    <div style="background-color: #f9fafb; border-left: 5px solid #10b981; padding: 15px; border-radius: 8px; margin-top: 10px;">
-      <strong>With the Enterprise Plan you get:</strong>
-      <ul>
-        <li>✅ Unlimited AI-powered queries per month</li>
-        <li>✅ Upload and manage multiple council databases</li>
-        <li>✅ 20+ user seats for large teams or entire departments</li>
-        <li>✅ Priority support and custom integrations</li>
-      </ul>
-      <em>Enterprise plan powers entire councils with secure, AI-enhanced service delivery.</em>
-    </div>
-    """, unsafe_allow_html=True)
-
-st.markdown("""
-<div style="color: #1f2937; font-size: 0.95rem; margin-top: 10px;">
-  CivReply AI is your always-on council knowledge assistant – now with team collaboration support.
-</div>
 """, unsafe_allow_html=True)
 
 if about_text:
@@ -140,9 +122,36 @@ st.markdown("### 🔍 Ask a local question:")
 user_question = st.text_input("Type your question here", placeholder="e.g., What day is bin collection in Wyndham?")
 user_email = st.text_input("Your email (optional)", placeholder="your@email.com")
 
+# --- Process Answer & Email ---
 if user_question:
-    st.session_state.query_count += 1
-    st.success(f"Query submitted! You’ve used {st.session_state.query_count} of {plan_queries} allowed queries.")
+    if st.session_state.query_count < plan_queries:
+        st.session_state.query_count += 1
+        st.markdown("✅ Processing your question...")
+        llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY)
+        retriever = FAISS.load_local("index/wyndham/index.faiss", OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)).as_retriever()
+        qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
+        answer = qa_chain.run(user_question)
+        st.markdown(f"**Answer:** {answer}")
+
+        if user_email and plan_limits[plan]["email"]:
+            if send_auto_email(user_email, user_question, answer):
+                st.success("✅ Answer sent to your email.")
+
+        # --- Feedback ---
+        st.markdown("### 🙋 Feedback")
+        feedback = st.radio("Was this answer helpful?", ["👍 Yes", "👎 No"], key=f"feedback_{st.session_state.query_count}")
+        comment = st.text_input("Any suggestions or notes?", key=f"comment_{st.session_state.query_count}")
+        if st.button("Submit Feedback"):
+            st.session_state.feedback.append({
+                "question": user_question,
+                "answer": answer,
+                "feedback": feedback,
+                "comment": comment,
+                "time": datetime.now().isoformat()
+            })
+            st.success("🙏 Thanks for your feedback!")
+    else:
+        st.error("❌ You've reached the maximum query limit for your plan.")
 
 # --- FAQs ---
 faqs = {
@@ -156,3 +165,15 @@ if council_key in faqs:
     st.markdown("### ❓ Frequently Asked Questions")
     for question, link in faqs[council_key]:
         st.markdown(f"- [{question}]({link})")
+
+# --- Optional: Admin view email log ---
+if st.session_state.get("is_admin") and st.session_state.email_log:
+    st.markdown("### 📬 Email Log")
+    for log in st.session_state.email_log:
+        st.markdown(f"- [{log['time']}] Sent to **{log['to']}** | Question: _{log['question']}_")
+
+# --- Optional: Admin view feedback log ---
+if st.session_state.get("is_admin") and st.session_state.feedback:
+    st.markdown("### 📣 Feedback Log")
+    for item in st.session_state.feedback:
+        st.markdown(f"- [{item['time']}] | Feedback: {item['feedback']} | Q: _{item['question']}_ | Comment: {item['comment']}")
