@@ -10,6 +10,7 @@ import imaplib
 import email
 import smtplib
 from email.mime.text import MIMEText
+import json
 
 # Load environment variables
 load_dotenv()
@@ -20,6 +21,10 @@ GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_PASS = os.getenv("GMAIL_PASS")
 
 st.set_page_config(page_title="CivReply AI", page_icon="\U0001F3DB️", layout="centered")
+
+# --- Load/Track Query Count ---
+if "query_count" not in st.session_state:
+    st.session_state.query_count = 0
 
 # --- Title ---
 st.markdown("""
@@ -42,7 +47,6 @@ council_landing_config = {
         "hero_image": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Wyndham_City_logo.png",
         "about": "Wyndham Council provides planning, permits, bins, and more. CivReply AI helps you navigate them effortlessly."
     }
-    # Add others as needed
 }
 
 # --- Council Dropdown ---
@@ -69,12 +73,18 @@ plan_name = plan.capitalize()
 plan_queries = plan_limits[plan]["queries"]
 plan_users = plan_limits[plan]["users"]
 
+# --- Enforce Query Limit ---
+if st.session_state.query_count >= plan_queries:
+    st.warning("You’ve reached your plan’s query limit. Upgrade to continue.")
+    st.stop()
+
 # --- Info Bars ---
 st.markdown(f"""
 <div class="user-info-bar">🧑 Council: {council} | 🔐 Role: {'Admin' if st.session_state.get('is_admin') else 'Guest'}</div>
 <div class="plan-box">💼 Plan: {plan_name} – {'Unlimited' if plan_queries == float('inf') else f'{plan_queries}'} instant answers/month | {plan_users} seat(s) | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
 """, unsafe_allow_html=True)
 
+# --- Plan Features Display ---
 if plan == "basic":
     st.markdown("""
     <div style="background-color: #f9fafb; border-left: 5px solid #3b82f6; padding: 15px; border-radius: 8px; margin-top: 10px;">
@@ -89,11 +99,6 @@ if plan == "basic":
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("""
-    > 🗣️ <em>“Our front desk saved 4 hours every week using CivReply AI. It’s like having a full-time assistant trained in council rules.”</em><br>
-    > — Local Government Staff Member
-    """)
-
 elif plan == "standard":
     st.markdown("""
     <div style="background-color: #f9fafb; border-left: 5px solid #3b82f6; padding: 15px; border-radius: 8px; margin-top: 10px;">
@@ -102,17 +107,10 @@ elif plan == "standard":
         <li>✅ 2,000 AI-powered queries per month</li>
         <li>✅ Upload custom council documents and PDFs</li>
         <li>✅ 5 user seats – ideal for departments and offices</li>
-        <li>✅ PDF policy/document lookup</li>
-        <li>✅ 24/7 availability for council-related questions</li>
       </ul>
       <em>Standard plan saves time across teams – and gives faster access to policy answers than staff alone.</em>
     </div>
     """, unsafe_allow_html=True)
-
-    st.markdown("""
-    > 🗣️ <em>“Our planning department uses CivReply AI to onboard new staff faster and reduce public enquiries.”</em><br>
-    > — Local Government IT Manager
-    """)
 
 elif plan == "enterprise":
     st.markdown("""
@@ -123,16 +121,10 @@ elif plan == "enterprise":
         <li>✅ Upload and manage multiple council databases</li>
         <li>✅ 20+ user seats for large teams or entire departments</li>
         <li>✅ Priority support and custom integrations</li>
-        <li>✅ 24/7 availability and analytics dashboard</li>
       </ul>
       <em>Enterprise plan powers entire councils with secure, AI-enhanced service delivery.</em>
     </div>
     """, unsafe_allow_html=True)
-
-    st.markdown("""
-    > 🏛️ <em>“We reduced public phone calls by 70% and empowered our team with CivReply Enterprise.”</em><br>
-    > — Municipal Transformation Officer
-    """)
 
 st.markdown("""
 <div style="color: #1f2937; font-size: 0.95rem; margin-top: 10px;">
@@ -147,6 +139,10 @@ if about_text:
 st.markdown("### 🔍 Ask a local question:")
 user_question = st.text_input("Type your question here", placeholder="e.g., What day is bin collection in Wyndham?")
 user_email = st.text_input("Your email (optional)", placeholder="your@email.com")
+
+if user_question:
+    st.session_state.query_count += 1
+    st.success(f"Query submitted! You’ve used {st.session_state.query_count} of {plan_queries} allowed queries.")
 
 # --- FAQs ---
 faqs = {
