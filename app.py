@@ -1,6 +1,3 @@
-# [EXTENDED CivReply AI Streamlit App – Version 2.3 – Role Refinement + Sidebar Threads + Tier UI]
-# Updates: Removed 'Business Owner' role, added ChatGPT-style sidebar chat history, and tier card display
-
 import streamlit as st
 import os
 import json
@@ -24,7 +21,7 @@ COUNCILS = ["Wyndham"]
 PLAN_CONFIG = {
     "basic": {"limit": 500, "label": "Basic ($499/mo)", "features": ["PDF Q&A"]},
     "standard": {"limit": 2000, "label": "Standard ($1499/mo)", "features": ["PDF Q&A", "Form Scraping"]},
-    "enterprise": {"limit": float("inf"), "label": "Enterprise ($2999+/mo)", "features": ["All Features"]}
+    "enterprise": {"limit": float("inf"), "label": "Enterprise ($2999+/mo)", "features": ["All Features"]},
 }
 
 # === ENV VAR CHECK ===
@@ -40,34 +37,65 @@ st.session_state.setdefault("user_role", "Resident")
 st.session_state.setdefault("council", "Wyndham")
 st.session_state.setdefault("session_start", datetime.now().isoformat())
 st.session_state.setdefault("plan", "basic")
+st.session_state.setdefault("language", "English")
 
-# === HEADER ===
-st.markdown(f"""
-    <div style='text-align: center;'>
-        <h1>🏛️ CivReply AI</h1>
-        <p>Smarter answers for smarter communities.</p>
-        <p>🧾 Active Council: <strong>{st.session_state.council}</strong> &nbsp;|&nbsp; 💼 Plan: <strong>{PLAN_CONFIG[st.session_state.plan]['label']}</strong></p>
-    </div>
-""", unsafe_allow_html=True)
+# ===== Header (context bar with Language + Upgrade side-by-side) =====
+left, lang_col, upgrade_col = st.columns([3, 1, 1])
+with left:
+    st.markdown(
+        f"""
+        <div style='display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:16px'>
+          <span>🏛️ <strong>Active Council:</strong> {st.session_state.council}</span>
+          <span>|</span>
+          <span>💼 <strong>Plan:</strong> {PLAN_CONFIG[st.session_state.plan]['label']}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+with lang_col:
+    st.markdown("🌐 Language")
+    st.session_state.language = st.selectbox(
+        "Language",
+        options=["English", "Arabic", "Chinese", "Hindi", "Spanish"],
+        index=["English", "Arabic", "Chinese", "Hindi", "Spanish"].index(st.session_state.language)
+        if st.session_state.get("language") in ["English", "Arabic", "Chinese", "Hindi", "Spanish"]
+        else 0,
+        label_visibility="collapsed",
+    )
+with upgrade_col:
+    try:
+        st.page_link("pages/upgrade_plan.py", label="💼 Upgrade Plan", use_container_width=True)
+    except Exception:
+        if st.button("💼 Upgrade Plan", use_container_width=True):
+            try:
+                st.switch_page("pages/upgrade_plan.py")
+            except Exception:
+                st.info("Create `pages/upgrade_plan.py` to enable the Upgrade Plan page.")
 
-# === INPUT CONTROLS ===
-cols = st.columns(2)
-with cols[0]:
-    st.session_state.user_role = st.selectbox("🧑 Role", ["Resident", "Staff", "Visitor"])
+# ===== Title =====
+st.title("CivReply AI")
+st.caption("Smarter answers for smarter communities.")
 
-# === SIDEBAR ===
+# === SIDEBAR (ChatGPT-style threads + nav) ===
 with st.sidebar:
-    st.image("https://www.wyndham.vic.gov.au/sites/default/files/styles/small/public/2020-06/logo_0.png", width=200)
+    st.image(
+        "https://www.wyndham.vic.gov.au/sites/default/files/styles/small/public/2020-06/logo_0.png",
+        width=200,
+    )
     st.title("CivReply AI")
-    nav = st.radio("📚 Menu", [
-        "💬 Chat with Council AI",
-        "🧾 Topic FAQs",
-        "📥 Submit a Request",
-        "📊 Stats & Session",
-        "📤 Export Logs",
-        "💡 Share Feedback",
-        "📞 Contact Us",
-        "⚙️ Admin Panel"])
+    nav = st.radio(
+        "📚 Menu",
+        [
+            "💬 Chat with Council AI",
+            "🧾 Topic FAQs",
+            "📥 Submit a Request",
+            "📊 Stats & Session",
+            "📤 Export Logs",
+            "💡 Share Feedback",
+            "📞 Contact Us",
+            "⚙️ Admin Panel",
+        ],
+    )
 
     if st.session_state.chat_history:
         st.markdown("---")
@@ -76,22 +104,21 @@ with st.sidebar:
             if st.button(f"Q: {q[:40]}...", key=f"history_{i}"):
                 st.session_state.chat_input = q
 
-# === PLAN CARD DISPLAY ===
-st.markdown("### 💼 Plan Comparison")
-cols = st.columns(3)
-for i, tier in enumerate(["basic", "standard", "enterprise"]):
-    with cols[i]:
-        st.markdown(f"""
-        <div style='border:1px solid #ddd;padding:1rem;border-radius:10px;'>
-            <h4>{PLAN_CONFIG[tier]['label']}</h4>
-            <ul>
-                {''.join([f'<li>{feat}</li>' for feat in PLAN_CONFIG[tier]['features']])}
-            </ul>
-            <p><strong>Limit:</strong> {PLAN_CONFIG[tier]['limit'] if PLAN_CONFIG[tier]['limit'] != float('inf') else 'Unlimited'} queries</p>
-        </div>
-        """, unsafe_allow_html=True)
+# ===== Role selector centered (Resident in the middle) =====
+st.markdown("#### 👤 Role")
+col1, col2, col3 = st.columns([1, 2, 1])
+with col2:
+    st.session_state.user_role = st.selectbox(
+        "Select Role",
+        options=["Resident", "Staff", "Visitor"],  # per v2.3 (Business Owner removed)
+        index=["Resident", "Staff", "Visitor"].index(st.session_state.get("user_role", "Resident")),
+        help="Your role helps tailor answers and available actions.",
+    )
+
+st.divider()
 
 # === FUNCTIONS ===
+
 def ask_ai(question, council):
     try:
         embeddings = OpenAIEmbeddings()
@@ -100,25 +127,33 @@ def ask_ai(question, council):
             raise FileNotFoundError(f"No index found for {council}")
         db = FAISS.load_local(index_path, embeddings)
         retriever = db.as_retriever()
-        qa = RetrievalQA.from_chain_type(llm=ChatOpenAI(api_key=OPENAI_KEY), chain_type="stuff", retriever=retriever)
+        qa = RetrievalQA.from_chain_type(
+            llm=ChatOpenAI(api_key=OPENAI_KEY), chain_type="stuff", retriever=retriever
+        )
         return qa.run(question)
     except Exception as e:
         return f"[Error] Could not answer: {str(e)}"
+
 
 def export_logs():
     filename = f"chatlog_{st.session_state.session_start}.txt"
     with open(filename, "w") as f:
         for q, a in st.session_state.chat_history:
-            f.write(f"Q: {q}\nA: {a}\n---\n")
+            f.write(f"Q: {q}
+A: {a}
+---
+")
     return filename
+
 
 def log_feedback(text, email):
     with open("feedback_log.txt", "a") as f:
-        f.write(f"{datetime.now().isoformat()} | {email or 'anon'} | {text}\n")
+        f.write(f"{datetime.now().isoformat()} | {email or 'anon'} | {text}
+")
 
 # === QUERY LIMIT CHECK ===
 plan_id = st.session_state.plan
-plan_limit = PLAN_CONFIG[plan_id]['limit']
+plan_limit = PLAN_CONFIG[plan_id]["limit"]
 
 if st.session_state.query_count >= plan_limit:
     st.warning(f"❗ You’ve reached the {PLAN_CONFIG[plan_id]['label']} limit.")
@@ -135,7 +170,9 @@ if nav == "💬 Chat with Council AI":
         with st.spinner("Wyndham GPT is replying..."):
             ai_reply = ask_ai(user_input, st.session_state.council)
             with st.chat_message("ai"):
-                st.markdown(f"📩 **Auto-response from Wyndham Council:**\n\n{ai_reply}")
+                st.markdown(f"📩 **Auto-response from Wyndham Council:**
+
+{ai_reply}")
             st.session_state.chat_history.append((user_input, ai_reply))
 
 elif nav == "🧾 Topic FAQs":
@@ -143,7 +180,7 @@ elif nav == "🧾 Topic FAQs":
     topics = {
         "Waste": ["How to report a missed bin?", "Where to get a new green bin?"],
         "Pets": ["Is dog registration required?", "Off-leash park locations?"],
-        "Events": ["What’s on this weekend?", "How to book community rooms?"]
+        "Events": ["What’s on this weekend?", "How to book community rooms?"],
     }
     topic = st.selectbox("📂 Choose a category", list(topics.keys()))
     for q in topics[topic]:
@@ -158,7 +195,7 @@ elif nav == "📊 Stats & Session":
     st.metric("Session Start", st.session_state.session_start)
     st.metric("Role", st.session_state.user_role)
     st.metric("Council", st.session_state.council)
-    st.metric("Plan", PLAN_CONFIG[st.session_state.plan]['label'])
+    st.metric("Plan", PLAN_CONFIG[st.session_state.plan]["label"])
 
 elif nav == "📤 Export Logs":
     if st.button("📄 Download Session Log"):
@@ -201,3 +238,5 @@ elif nav == "⚙️ Admin Panel":
                 st.success("✅ Index rebuilt successfully.")
             else:
                 st.warning("Please upload at least one document.")
+
+# NOTE: Tier cards / plan comparison have been moved to `pages/upgrade_plan.py` per earlier design.
