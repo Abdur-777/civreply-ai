@@ -1,9 +1,23 @@
-streamlit
-openai
-langchain
-langchain-openai
-langchain-community
-python-dotenv
-pypdf
-tiktoken
-faiss-cpu
+# UI
+streamlit>=1.32
+
+# LLM + LangChain
+openai>=1.30
+tiktoken>=0.7
+langchain>=0.2
+langchain-community>=0.2
+langchain-openai>=0.1
+
+# Vector store (choose ONE: FAISS or Chroma)
+faiss-cpu>=1.8
+# chromadb>=0.5   # <- uncomment if you want Chroma instead of FAISS
+
+# PDF handling
+pypdf>=4.0
+
+# Utilities used in your app
+python-dotenv>=1.0
+pandas>=2.0
+numpy>=1.26
+requests>=2.31
+tenacity>=8.2
