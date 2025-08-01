@@ -90,9 +90,6 @@ council_landing_config = {
 }
 
 # Set default council logo and tagline
-...
-
-# Set default council logo and tagline
 default_council = "Wyndham"
 default_key = default_council.lower().replace(" ", "_")
 default_config = council_landing_config.get(default_key, {})
@@ -107,11 +104,6 @@ st.markdown(f"""
     flex-direction: column;
     align-items: center;
     margin-bottom: 20px;
-  }}
-  .hero-image {{
-    width: 100%;
-    max-width: 300px;
-    margin-bottom: 10px;
   }}
   .tagline {{
     text-align: center;
@@ -135,6 +127,13 @@ if not st.session_state.is_admin:
         st.success("✅ Admin access granted.")
     elif password:
         st.error("❌ Incorrect password")
+
+# --- File Uploader (Admin Only) ---
+if st.session_state.is_admin:
+    st.markdown("### 📤 Upload Council PDFs")
+    uploaded_files = st.file_uploader("Upload one or more PDF files", type=["pdf"], accept_multiple_files=True)
+    if uploaded_files:
+        st.success(f"Uploaded {len(uploaded_files)} file(s). (Processing logic goes here.)")
 
 # --- Council Dropdown ---
 councils = list(council_landing_config.keys())
@@ -161,7 +160,31 @@ plan_users = plan_limits[plan]["users"]
 # --- Info Bars ---
 st.markdown(f"""
 <div class="user-info-bar">🧑 Council: {council} | 🔐 Role: {'Admin' if st.session_state.is_admin else 'Guest'}</div>
-<div class="plan-box">📦 Plan: {plan_name} – {'Unlimited' if plan_queries == float('inf') else f'{plan_queries}'} queries/month | {plan_users} user(s) | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
+<div class="plan-box">💼 Plan: Smart Solo – {'Unlimited' if plan_queries == float('inf') else f'{plan_queries}'} instant answers/month | {plan_users} seat(s) | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div style="background-color: #f9fafb; border-left: 5px solid #3b82f6; padding: 15px; border-radius: 8px; margin-top: 10px;">
+  <strong>With the Basic Plan you get:</strong>
+  <ul>
+    <li>✅ 500 AI-powered queries per month</li>
+    <li>✅ PDF policy/document lookup (no need to search manually)</li>
+    <li>✅ 24/7 availability for council-related questions</li>
+    <li>✅ 1 user seat – perfect for solo operators, reception desks, or admin officers</li>
+  </ul>
+  <em>That’s just $1 per question – and 10x faster than calling or searching council websites.</em>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+> 🗣️ <em>“Our front desk saved 4 hours every week using CivReply AI. It’s like having a full-time assistant trained in council rules.”</em><br>
+> — Local Government Staff Member
+""")
+
+st.markdown("""
+<div style="color: #1f2937; font-size: 0.95rem; margin-top: 10px;">
+  CivReply AI costs less than a single staff hour per month – yet it answers 500+ questions instantly.
+</div>
 """, unsafe_allow_html=True)
 
 if about_text:
@@ -177,11 +200,6 @@ faqs = {
         ("How do I apply for a building permit?", "https://www.wyndham.vic.gov.au/services/building-planning/building/permits"),
         ("When is bin collection day?", "https://www.wyndham.vic.gov.au/services/waste-recycling/bin-collection"),
         ("Contact Wyndham Council", "https://www.wyndham.vic.gov.au/contact-us")
-    ],
-    "melbourne": [
-        ("How do I report a noise complaint?", "https://www.melbourne.vic.gov.au/community/health-support-services/noise/pages/noise-complaints.aspx"),
-        ("Where can I park in the city?", "https://www.melbourne.vic.gov.au/parking-and-transport/parking/pages/parking.aspx"),
-        ("Contact Melbourne Council", "https://www.melbourne.vic.gov.au/about-council/contact-us/pages/contact-us.aspx")
     ]
 }
 
