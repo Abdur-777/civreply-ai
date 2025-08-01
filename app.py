@@ -1,17 +1,11 @@
 import streamlit as st
 import os
-import json
-import base64
-import shutil
 from datetime import datetime
 from langchain.chains import RetrievalQA
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from pathlib import Path
-import time
-import pandas as pd
 
 # === APP CONFIG ===
 st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="wide")
@@ -24,13 +18,11 @@ PLAN_CONFIG = {
     "enterprise": {"limit": float("inf"), "label": "Enterprise ($2999+/mo)", "features": ["All Features"]},
 }
 
-# === ENV VAR CHECK ===
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_KEY:
     st.error("❌ Missing OpenAI API Key. Please set `OPENAI_API_KEY` in your environment.")
     st.stop()
 
-# === SESSION INIT ===
 st.session_state.setdefault("chat_history", [])
 st.session_state.setdefault("query_count", 0)
 st.session_state.setdefault("user_role", "Resident")
@@ -39,11 +31,35 @@ st.session_state.setdefault("session_start", datetime.now().isoformat())
 st.session_state.setdefault("plan", "basic")
 st.session_state.setdefault("language", "English")
 
-# ===== TITLE (center) =====
-st.markdown("<h1 style='text-align:center;margin-bottom:0.5em;'>CivReply AI</h1>", unsafe_allow_html=True)
+# ===== HEADER: CivReply AI with Wyndham logo =====
+st.markdown(
+    """
+    <div style='display: flex; align-items: center; justify-content: center; margin-top: 10px; margin-bottom: 8px;'>
+        <img src="https://www.wyndham.vic.gov.au/sites/default/files/styles/small/public/2020-06/logo_0.png" width="44" style="margin-right: 14px; border-radius:10px;" />
+        <h1 style='margin-bottom: 0; margin-top: 0; font-size: 2.7rem;'>CivReply AI</h1>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
-# ===== Controls row: Language | Role | Upgrades =====
-ctrl_cols = st.columns([2,2,2], gap="large")
+# ===== BLUE WYNDHAM COUNCIL BADGE =====
+st.markdown(
+    """
+    <div style='display: flex; justify-content: center; margin-bottom: 25px;'>
+        <span style="
+            background: linear-gradient(90deg, #e3f0ff 60%, #c6e0ff 100%);
+            color: #0a318e; font-weight: bold;
+            border-radius: 16px; padding: 7px 28px; font-size: 1.1rem;
+            box-shadow: 0 2px 8px #b5d1f180;">
+            🏛️ Active Council: Wyndham
+        </span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# ===== Controls row: Language | Role =====
+ctrl_cols = st.columns([1,1], gap="large")
 with ctrl_cols[0]:
     st.markdown("🌐 <b>Language</b>", unsafe_allow_html=True)
     st.session_state.language = st.selectbox(
@@ -64,18 +80,11 @@ with ctrl_cols[1]:
         label_visibility="collapsed",
         key="role_selector"
     )
-with ctrl_cols[2]:
-    if st.button("💼 Upgrades", use_container_width=True, key="upgrade_header"):
-        st.session_state["goto_upgrades"] = True
 
 st.markdown("---")
 
-# === SIDEBAR (Menu & chat history) ===
+# === SIDEBAR ===
 with st.sidebar:
-    st.image(
-        "https://www.wyndham.vic.gov.au/sites/default/files/styles/small/public/2020-06/logo_0.png",
-        width=200,
-    )
     st.title("CivReply AI")
     nav = st.radio(
         "📚 Menu",
@@ -91,7 +100,6 @@ with st.sidebar:
             "⚙️ Admin Panel",
         ],
     )
-
     if st.session_state.chat_history:
         st.markdown("---")
         st.markdown("### 🧠 Recent Q&A")
@@ -99,11 +107,10 @@ with st.sidebar:
             if st.button(f"Q: {q[:40]}...", key=f"history_{i}"):
                 st.session_state.chat_input = q
     st.markdown("---")
-    # Bottom left upgrades button (always visible)
+    # Bottom left upgrades button
     if st.button("💼 Upgrades", use_container_width=True, key="sidebar_upgrade"):
         st.session_state["goto_upgrades"] = True
 
-# Quick jump from header or sidebar upgrades button
 if st.session_state.get("goto_upgrades"):
     nav = "⬆️ Upgrades"
     st.session_state["goto_upgrades"] = False
@@ -126,7 +133,6 @@ def ask_ai(question, council):
         return f"[Error] Could not answer: {str(e)}"
 
 def export_logs():
-    # Write chat history to a simple text file with \n newlines (NO literal newlines)
     filename = f"chatlog_{st.session_state.session_start}.txt"
     with open(filename, "w") as f:
         for q, a in st.session_state.chat_history:
@@ -136,7 +142,6 @@ def export_logs():
     return filename
 
 def log_feedback(text, email):
-    # Append feedback entries to a simple log with newline separators
     with open("feedback_log.txt", "a") as f:
         entry = f"{datetime.now().isoformat()} | {email or 'anon'} | {text}\n"
         f.write(entry)
@@ -144,7 +149,6 @@ def log_feedback(text, email):
 # === QUERY LIMIT CHECK ===
 plan_id = st.session_state.plan
 plan_limit = PLAN_CONFIG[plan_id]["limit"]
-
 if st.session_state.query_count >= plan_limit:
     st.warning(f"❗ You’ve reached the {PLAN_CONFIG[plan_id]['label']} limit.")
     st.stop()
@@ -180,17 +184,12 @@ elif nav == "📥 Submit a Request":
 
 elif nav == "⬆️ Upgrades":
     st.title("Upgrade your plan")
-
-    # Segmented toggle (Personal | Business)
     mode = st.segmented_control(
         "Choose plan type",
         options=["Personal", "Business"],
         default="Business",
     )
-
     st.write("")
-
-    # Plan card helper
     def plan_card(title, price, period, tagline, cta_label, features):
         with st.container(border=True):
             st.subheader(title)
@@ -217,7 +216,7 @@ elif nav == "⬆️ Upgrades":
                 "Use on web and mobile",
             ],
         )
-    else:  # Business — remove Team, keep three business tiers
+    else:
         st.subheader("Compare business tiers")
         cols = st.columns(3)
         with cols[0]:
