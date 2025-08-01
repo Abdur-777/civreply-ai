@@ -94,7 +94,6 @@ with st.sidebar:
             "📥 Submit a Request",
             "⬆️ Upgrades",
             "📊 Stats & Session",
-            "📤 Export Logs",
             "💡 Share Feedback",
             "📞 Contact Us",
             "⚙️ Admin Panel",
@@ -184,12 +183,13 @@ elif nav == "⬆️ Upgrades":
         default="Business",
     )
     st.write("")
+
     def plan_card(title, price, period, tagline, cta_label, features):
         with st.container(border=True):
             st.subheader(title)
             price_col, _ = st.columns([1, 3])
             with price_col:
-                st.markdown(f"### ${price}  \n**USD / {period}**")
+                st.markdown(f"<span style='font-size:2.2rem; font-weight:600;'>${price}</span><br><span style='font-size:1rem;'>USD / month</span>", unsafe_allow_html=True)
             st.markdown(tagline)
             st.button(cta_label, use_container_width=True)
             st.markdown("---")
@@ -214,14 +214,52 @@ elif nav == "⬆️ Upgrades":
         st.subheader("Compare business tiers")
         cols = st.columns(3)
         with cols[0]:
-            plan_card("Basic", "499", "month", "For small teams getting started.",
-                      "Choose Basic", ["PDF Q&A", "Limit: 500 queries"])
+            plan_card(
+                "Basic", "499", "month", "For small teams getting started.",
+                "Choose Basic",
+                [
+                    "PDF Q&A (ask about any council document)",
+                    "Limit: 500 queries",
+                    "Email support (48h response)",
+                    "Council policy finder",
+                    "Mobile access",
+                    "Secure cloud storage",
+                    "Community knowledge base",
+                ]
+            )
         with cols[1]:
-            plan_card("Standard", "1499", "month", "Scale insights across your council.",
-                      "Choose Standard", ["PDF Q&A", "Form Scraping", "Limit: 2000 queries"])
+            plan_card(
+                "Standard", "1499", "month", "Scale insights across your council.",
+                "Choose Standard",
+                [
+                    "Everything in Basic",
+                    "Limit: 2000 queries",
+                    "Form Scraping (auto-extract info from forms)",
+                    "Priority email & chat support (24h)",
+                    "Usage analytics dashboard",
+                    "PDF export of chats",
+                    "Multi-language Q&A",
+                    "Bulk data uploads",
+                    "Custom council branding",
+                ]
+            )
         with cols[2]:
-            plan_card("Enterprise", "2999+", "month", "For large organizations that need controls and scale.",
-                      "Contact Sales", ["All Features", "Limit: Unlimited queries"])
+            plan_card(
+                "Enterprise", "2999+", "month", "For large organizations that need controls and scale.",
+                "Contact Sales",
+                [
+                    "Everything in Standard",
+                    "Limit: Unlimited queries",
+                    "Dedicated account manager",
+                    "API access & automation",
+                    "SLA: 99.9% uptime",
+                    "Single Sign-On (SSO)",
+                    "Staff training sessions",
+                    "Integration with 3rd party tools (Teams, Slack, etc.)",
+                    "On-premise/cloud deployment options",
+                    "Custom workflow automations",
+                ]
+            )
 
 elif nav == "📊 Stats & Session":
     st.metric("Total Questions", st.session_state.query_count)
@@ -229,12 +267,6 @@ elif nav == "📊 Stats & Session":
     st.metric("Role", st.session_state.user_role)
     st.metric("Council", st.session_state.council)
     st.metric("Plan", PLAN_CONFIG[st.session_state.plan]["label"])
-
-elif nav == "📤 Export Logs":
-    if st.button("📄 Download Session Log"):
-        fname = export_logs()
-        with open(fname, "rb") as f:
-            st.download_button("📥 Download", f, file_name=fname)
 
 elif nav == "💡 Share Feedback":
     fb = st.text_area("Tell us what’s working or not...")
