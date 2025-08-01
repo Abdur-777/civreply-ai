@@ -240,3 +240,36 @@ elif nav == "⚙️ Admin Panel":
                 st.warning("Please upload at least one document.")
 
 # NOTE: Tier cards / plan comparison have been moved to `pages/upgrade_plan.py` per earlier design.
+
+elif nav == "⬆️ Upgrades":
+    st.title("Upgrade your plan")
+
+    mode = st.segmented_control(
+        "Choose plan type",
+        options=["Personal", "Business"],
+        default="Business",
+    )
+
+    st.write("")
+
+    def plan_card(title, price, period, tagline, cta_label, features):
+        with st.container(border=True):
+            st.subheader(title)
+            price_col, _ = st.columns([1, 3])
+            with price_col:
+                st.markdown(f"### ${price}  \n**USD / {period}**")
+            st.markdown(tagline)
+            st.button(cta_label, use_container_width=True)
+            st.markdown("---")
+            for f in features:
+                st.markdown(f"- {f}")
+
+    if mode == "Personal":
+        plan_card(
+            title="Plus",
+            price="20",
+            period="month",
+            tagline="Great for power users who want faster answers and longer context.",
+            cta_label="Upgrade to Plus",
+            features=[
+                "Priority compute and faster responses
