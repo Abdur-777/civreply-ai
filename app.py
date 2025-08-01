@@ -1,5 +1,3 @@
-# CivReply AI – Upgraded Version with Plan Handling, Admin Upload, Multi-Council Support, Stripe, and Gmail Auto-Reply
-
 import os
 import streamlit as st
 from langchain.chains import RetrievalQA
@@ -21,15 +19,13 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "supersecret")
 GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_PASS = os.getenv("GMAIL_PASS")
 
-st.set_page_config(page_title="CivReply AI", page_icon="\U0001F3DB️", layout="centered")
+st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="centered")
 
 # --- Session State Initialization ---
 if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
-
 if "plan" not in st.session_state:
     st.session_state.plan = "basic"
-
 if "query_count" not in st.session_state:
     st.session_state.query_count = 0
 
@@ -59,13 +55,11 @@ plan_limits = {
     "standard": {"queries": 2000, "users": 5},
     "enterprise": {"queries": float("inf"), "users": 20},
 }
-
 plan_name = st.session_state.plan.capitalize()
 plan_queries = plan_limits[st.session_state.plan]["queries"]
 plan_users = plan_limits[st.session_state.plan]["users"]
 
-# --- Council Custom Content ---
-# --- Council Custom Content ---
+# --- Council Configs ---
 council_landing_config = {
     "wyndham": {
         "tagline": "Empowering Wyndham residents with smarter answers.",
@@ -118,14 +112,57 @@ council_landing_config = {
         "about": "Find what you need about permits, parking, and arts programs across Port Phillip."
     }
 }
-
-
 config = council_landing_config.get(council_key, {})
 tagline = config.get("tagline", f"Ask {council} Council anything – policies, laws, documents.")
 hero_image = config.get("hero_image")
 about_text = config.get("about", "")
 
-# --- Custom FAQs and Contact Links ---
+# --- Responsive Branding Section ---
+st.markdown(f"""
+<style>
+  body {{ font-family: 'Segoe UI', sans-serif; }}
+  .header {{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 20px;
+  }}
+  .hero-image {{
+    width: 100%;
+    max-width: 300px;
+    margin-bottom: 10px;
+  }}
+  .title {{
+    font-size: 2.8rem;
+    margin: 0;
+    font-weight: bold;
+  }}
+  .tagline {{
+    text-align: center;
+    font-size: 1.1rem;
+    color: #555;
+    margin-bottom: 20px;
+  }}
+  .user-info-bar, .plan-box {{
+    background-color: #eef6ff;
+    padding: 10px 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+  }}
+  .question-label {{
+    font-size: 1rem;
+    color: #374151;
+    margin-bottom: 6px;
+  }}
+</style>
+<div class="header">
+  <img src="{hero_image}" alt="Council Logo" class="hero-image" />
+  <div class="title">🏛️ CivReply AI</div>
+</div>
+<div class="tagline">{tagline}</div>
+""", unsafe_allow_html=True)
+
+# --- FAQs ---
 faqs = {
     "wyndham": [
         ("How do I apply for a building permit?", "https://www.wyndham.vic.gov.au/services/building-planning/building/permits"),
@@ -137,38 +174,17 @@ faqs = {
         ("Where can I park in the city?", "https://www.melbourne.vic.gov.au/parking-and-transport/parking/pages/parking.aspx"),
         ("Contact Melbourne Council", "https://www.melbourne.vic.gov.au/about-council/contact-us/pages/contact-us.aspx")
     ],
-    # Add more council FAQs as needed
+    # Add more if needed
 }
-
 if council_key in faqs:
     st.markdown("### ❓ Frequently Asked Questions")
     for question, link in faqs[council_key]:
         st.markdown(f"- [{question}]({link})")
 
-# --- Branding ---
+# --- Info Bars ---
 st.markdown(f"""
-<style>
-  body {{ font-family: 'Segoe UI', sans-serif; }}
-  .header {{ display: flex; justify-content: center; gap: 12px; margin-bottom: 10px; }}
-  .header h1 {{ font-size: 2.5rem; margin: 0; }}
-  .tagline {{ text-align: center; font-size: 1.1rem; color: #555; margin-bottom: 20px; }}
-  .user-info-bar, .plan-box {{ background-color: #eef6ff; padding: 10px 15px; border-radius: 12px; margin-bottom: 20px; }}
-  .question-label {{ font-size: 1rem; color: #374151; margin-bottom: 6px; }}
-  .footer {{ text-align: center; font-size: 0.85rem; color: #6b7280; margin-top: 30px; }}
-</style>
-<div class="header">
-  <div style="font-size: 2rem;">\U0001F3DB️</div>
-  <h1>CivReply AI</h1>
-</div>
-""", unsafe_allow_html=True)
-
-if hero_image:
-    st.image(hero_image, use_column_width=True)
-
-st.markdown(f"""
-<div class="tagline">{tagline}</div>
-<div class="user-info-bar">\U0001F9D1 Council: {council} | 🔐 Role: {'Admin' if st.session_state.is_admin else 'Guest'}</div>
-<div class="plan-box">\U0001F4E6 Plan: {plan_name} – {'Unlimited' if plan_queries == float('inf') else f'{plan_queries}'} queries/month | {plan_users} user(s) | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
+<div class="user-info-bar">🧑 Council: {council} | 🔐 Role: {'Admin' if st.session_state.is_admin else 'Guest'}</div>
+<div class="plan-box">📦 Plan: {plan_name} – {'Unlimited' if plan_queries == float('inf') else f'{plan_queries}'} queries/month | {plan_users} user(s) | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
 <div class="question-label">🔍 Ask a local question:</div>
 """, unsafe_allow_html=True)
 
