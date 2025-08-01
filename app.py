@@ -42,13 +42,55 @@ council_landing_config = {
         "hero_image": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Wyndham_City_logo.png",
         "about": "Wyndham Council provides planning, permits, bins, and more. CivReply AI helps you navigate them effortlessly."
     },
-    "melbourne": {
-        "tagline": "Your personal assistant for City of Melbourne policies.",
-        "hero_image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/City_of_Melbourne_logo.svg/2560px-City_of_Melbourne_logo.svg.png",
-        "about": "Discover services, permits, and events across central Melbourne—instantly."
+    "brimbank": {
+        "tagline": "Smart answers for Brimbank locals.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/6/65/Brimbank_City_Council_logo.png",
+        "about": "Your AI-powered guide to waste collection, parking, development, and more in Brimbank."
     },
-    # Add other councils...
+    "hobsons_bay": {
+        "tagline": "Navigate Hobsons Bay Council with ease.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/f/f1/Hobsons_Bay_City_Council_logo.png",
+        "about": "Explore building permits, community services, and environment info powered by CivReply AI."
+    },
+    "yarra": {
+        "tagline": "Yarra Council services, now at your fingertips.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/f/f3/City_of_Yarra_logo.png",
+        "about": "From community programs to local laws—explore all that Yarra offers with CivReply AI."
+    },
+    "moreland": {
+        "tagline": "Simplifying Moreland’s services with AI.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/2/2f/Moreland_City_Council_logo.png",
+        "about": "Your go-to assistant for understanding Moreland’s policies, recycling, and community grants."
+    },
+    "darebin": {
+        "tagline": "Answers for Darebin residents, instantly.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/2/29/Darebin_City_Council_logo.png",
+        "about": "AI-powered access to Darebin Council services, forms, and waste schedules."
+    },
+    "boroondara": {
+        "tagline": "Explore Boroondara with clarity and confidence.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/5/55/City_of_Boroondara_Logo.png",
+        "about": "Everything from permits to planning in Boroondara—smartly answered."
+    },
+    "stonnington": {
+        "tagline": "Stonnington Council guidance made easy.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/e/eb/City_of_Stonnington_logo.png",
+        "about": "Your streamlined AI interface to council services, local laws, and event info."
+    },
+    "port_phillip": {
+        "tagline": "Port Phillip AI assistant for all services.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/b/bc/City_of_Port_Phillip_logo.png",
+        "about": "Find what you need about permits, parking, and arts programs across Port Phillip."
+    },
+    "hume": {
+        "tagline": "Helping Hume residents with everyday council queries.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/5/5e/Hume_City_Council_logo.png",
+        "about": "Access services, permits, and updates for Hume City with CivReply AI."
+    }
 }
+
+# Set default council logo and tagline
+...
 
 # Set default council logo and tagline
 default_council = "Wyndham"
@@ -79,7 +121,6 @@ st.markdown(f"""
   }}
 </style>
 <div class="header">
-  <img src="{hero_image}" alt="Council Logo" class="hero-image" />
   <div class="tagline">{tagline}</div>
 </div>
 """, unsafe_allow_html=True)
