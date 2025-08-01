@@ -76,6 +76,52 @@ council_landing_config = {
         "hero_image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/City_of_Melbourne_logo.svg/2560px-City_of_Melbourne_logo.svg.png",
         "about": "Discover services, permits, and events across central Melbourne—instantly."
     },
+    "brimbank": {
+        "tagline": "Smart answers for Brimbank locals.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/6/65/Brimbank_City_Council_logo.png",
+        "about": "Your AI-powered guide to waste collection, parking, development, and more in Brimbank."
+    },
+    "yarra": {
+        "tagline": "Yarra Council services, now at your fingertips.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/f/f3/City_of_Yarra_logo.png",
+        "about": "From community programs to local laws—explore all that Yarra offers with CivReply AI."
+    },
+    "hobsons_bay": {
+        "tagline": "Navigate Hobsons Bay Council with ease.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/f/f1/Hobsons_Bay_City_Council_logo.png",
+        "about": "Explore building permits, community services, and environment info powered by CivReply AI."
+    },
+    "moreland": {
+        "tagline": "Simplifying Moreland’s services with AI.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/2/2f/Moreland_City_Council_logo.png",
+        "about": "Your go-to assistant for understanding Moreland’s policies, recycling, and community grants."
+    },
+    "darebin": {
+        "tagline": "Answers for Darebin residents, instantly.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/2/29/Darebin_City_Council_logo.png",
+        "about": "AI-powered access to Darebin Council services, forms, and waste schedules."
+    },
+    "boroondara": {
+        "tagline": "Explore Boroondara with clarity and confidence.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/5/55/City_of_Boroondara_Logo.png",
+        "about": "Everything from permits to planning in Boroondara—smartly answered."
+    },
+    "stonnington": {
+        "tagline": "Stonnington Council guidance made easy.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/e/eb/City_of_Stonnington_logo.png",
+        "about": "Your streamlined AI interface to council services, local laws, and event info."
+    },
+    "port_phillip": {
+        "tagline": "Port Phillip AI assistant for all services.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/en/b/bc/City_of_Port_Phillip_logo.png",
+        "about": "Find what you need about permits, parking, and arts programs across Port Phillip."
+    }
+},
+    "melbourne": {
+        "tagline": "Your personal assistant for City of Melbourne policies.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/City_of_Melbourne_logo.svg/2560px-City_of_Melbourne_logo.svg.png",
+        "about": "Discover services, permits, and events across central Melbourne—instantly."
+    },
     # Add more as needed
 }
 
@@ -83,6 +129,26 @@ config = council_landing_config.get(council_key, {})
 tagline = config.get("tagline", f"Ask {council} Council anything – policies, laws, documents.")
 hero_image = config.get("hero_image")
 about_text = config.get("about", "")
+
+# --- Custom FAQs and Contact Links ---
+faqs = {
+    "wyndham": [
+        ("How do I apply for a building permit?", "https://www.wyndham.vic.gov.au/services/building-planning/building/permits"),
+        ("When is bin collection day?", "https://www.wyndham.vic.gov.au/services/waste-recycling/bin-collection"),
+        ("Contact Wyndham Council", "https://www.wyndham.vic.gov.au/contact-us")
+    ],
+    "melbourne": [
+        ("How do I report a noise complaint?", "https://www.melbourne.vic.gov.au/community/health-support-services/noise/pages/noise-complaints.aspx"),
+        ("Where can I park in the city?", "https://www.melbourne.vic.gov.au/parking-and-transport/parking/pages/parking.aspx"),
+        ("Contact Melbourne Council", "https://www.melbourne.vic.gov.au/about-council/contact-us/pages/contact-us.aspx")
+    ],
+    # Add more council FAQs as needed
+}
+
+if council_key in faqs:
+    st.markdown("### ❓ Frequently Asked Questions")
+    for question, link in faqs[council_key]:
+        st.markdown(f"- [{question}]({link})")
 
 # --- Branding ---
 st.markdown(f"""
