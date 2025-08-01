@@ -139,13 +139,15 @@ if user_question:
 
         # --- Feedback ---
         st.markdown("### 🙋 Feedback")
-        feedback = st.radio("Was this answer helpful?", ["👍 Yes", "👎 No"], key=f"feedback_{st.session_state.query_count}")
+        rating = st.slider("Rate your answer:", 1, 5, 3, key=f"rating_{st.session_state.query_count}")
+        emoji_display = "⭐" * rating
+        st.markdown(f"You rated: {emoji_display}")
         comment = st.text_input("Any suggestions or notes?", key=f"comment_{st.session_state.query_count}")
         if st.button("Submit Feedback"):
             st.session_state.feedback.append({
                 "question": user_question,
                 "answer": answer,
-                "feedback": feedback,
+                "rating": rating,
                 "comment": comment,
                 "time": datetime.now().isoformat()
             })
@@ -176,4 +178,5 @@ if st.session_state.get("is_admin") and st.session_state.email_log:
 if st.session_state.get("is_admin") and st.session_state.feedback:
     st.markdown("### 📣 Feedback Log")
     for item in st.session_state.feedback:
-        st.markdown(f"- [{item['time']}] | Feedback: {item['feedback']} | Q: _{item['question']}_ | Comment: {item['comment']}")
+        stars = "⭐" * item['rating']
+        st.markdown(f"- [{item['time']}] | Rating: {stars} | Q: _{item['question']}_ | Comment: {item['comment']}")
