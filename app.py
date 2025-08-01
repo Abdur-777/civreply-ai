@@ -13,9 +13,9 @@ st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="wide")
 # === SETTINGS ===
 COUNCILS = ["Wyndham"]
 PLAN_CONFIG = {
-    "basic": {"limit": 500, "label": "Basic ($499/mo)", "features": ["PDF Q&A"]},
-    "standard": {"limit": 2000, "label": "Standard ($1499/mo)", "features": ["PDF Q&A", "Form Scraping"]},
-    "enterprise": {"limit": float("inf"), "label": "Enterprise ($2999+/mo)", "features": ["All Features"]},
+    "basic": {"limit": 500, "label": "Basic ($499 AUD/mo)", "features": ["PDF Q&A"]},
+    "standard": {"limit": 2000, "label": "Standard ($1499 AUD/mo)", "features": ["PDF Q&A", "Form Scraping"]},
+    "enterprise": {"limit": float("inf"), "label": "Enterprise ($2999+ AUD/mo)", "features": ["All Features"]},
 }
 
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
@@ -136,15 +136,6 @@ def ask_ai(question, council):
     except Exception as e:
         return f"[Error] Could not answer: {str(e)}"
 
-def export_logs():
-    filename = f"chatlog_{st.session_state.session_start}.txt"
-    with open(filename, "w") as f:
-        for q, a in st.session_state.chat_history:
-            f.write("Q: " + str(q) + "\n")
-            f.write("A: " + str(a) + "\n")
-            f.write("---\n")
-    return filename
-
 def log_feedback(text, email):
     with open("feedback_log.txt", "a") as f:
         entry = f"{datetime.now().isoformat()} | {email or 'anon'} | {text}\n"
@@ -184,12 +175,13 @@ elif nav == "⬆️ Upgrades":
     )
     st.write("")
 
-    def plan_card(title, price, period, tagline, cta_label, features):
+    def plan_card(title, price, tagline, cta_label, features):
         with st.container(border=True):
             st.subheader(title)
-            price_col, _ = st.columns([1, 3])
-            with price_col:
-                st.markdown(f"<span style='font-size:2.2rem; font-weight:600;'>${price}</span><br><span style='font-size:1rem;'>USD / month</span>", unsafe_allow_html=True)
+            st.markdown(
+                f"<span style='font-size:2.2rem; font-weight:600;'>${price} <span style='font-size:1.1rem; font-weight:400; color:#2c3e50;'>AUD/mo</span></span>",
+                unsafe_allow_html=True
+            )
             st.markdown(tagline)
             st.button(cta_label, use_container_width=True)
             st.markdown("---")
@@ -200,7 +192,6 @@ elif nav == "⬆️ Upgrades":
         plan_card(
             title="Plus",
             price="20",
-            period="month",
             tagline="Great for power users who want faster answers and longer context.",
             cta_label="Upgrade to Plus",
             features=[
@@ -215,7 +206,7 @@ elif nav == "⬆️ Upgrades":
         cols = st.columns(3)
         with cols[0]:
             plan_card(
-                "Basic", "499", "month", "For small teams getting started.",
+                "Basic", "499", "For small teams getting started.",
                 "Choose Basic",
                 [
                     "PDF Q&A (ask about any council document)",
@@ -229,7 +220,7 @@ elif nav == "⬆️ Upgrades":
             )
         with cols[1]:
             plan_card(
-                "Standard", "1499", "month", "Scale insights across your council.",
+                "Standard", "1499", "Scale insights across your council.",
                 "Choose Standard",
                 [
                     "Everything in Basic",
@@ -245,7 +236,7 @@ elif nav == "⬆️ Upgrades":
             )
         with cols[2]:
             plan_card(
-                "Enterprise", "2999+", "month", "For large organizations that need controls and scale.",
+                "Enterprise", "2999+", "For large organizations that need controls and scale.",
                 "Contact Sales",
                 [
                     "Everything in Standard",
