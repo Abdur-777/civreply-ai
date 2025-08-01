@@ -31,12 +31,13 @@ st.session_state.setdefault("session_start", datetime.now().isoformat())
 st.session_state.setdefault("plan", "basic")
 st.session_state.setdefault("language", "English")
 
-# ===== HEADER: CivReply AI with Wyndham logo =====
+# ===== CivReply AI title with Wyndham logo and photo =====
 st.markdown(
     """
-    <div style='display: flex; align-items: center; justify-content: center; margin-top: 10px; margin-bottom: 8px;'>
-        <img src="https://www.wyndham.vic.gov.au/sites/default/files/styles/small/public/2020-06/logo_0.png" width="44" style="margin-right: 14px; border-radius:10px;" />
-        <h1 style='margin-bottom: 0; margin-top: 0; font-size: 2.7rem;'>CivReply AI</h1>
+    <div style='display: flex; align-items: center; justify-content: center; margin-top: 10px; margin-bottom: 8px; gap: 18px;'>
+        <img src="https://www.wyndham.vic.gov.au/sites/default/files/styles/small/public/2020-06/logo_0.png" width="44" style="border-radius:8px;" />
+        <h1 style='margin-bottom: 0; margin-top: 0; font-size: 2.5rem;'>CivReply AI</h1>
+        <img src="https://www.wyndham.vic.gov.au/sites/default/files/styles/media_crop/public/2022-04/Wyndham-city-aerial-photo.jpg" width="52" style="border-radius:10px; box-shadow: 0 2px 10px #b5d1f1aa;" />
     </div>
     """,
     unsafe_allow_html=True
@@ -90,7 +91,6 @@ with st.sidebar:
         "📚 Menu",
         [
             "💬 Chat with Council AI",
-            "🧾 Topic FAQs",
             "📥 Submit a Request",
             "⬆️ Upgrades",
             "📊 Stats & Session",
@@ -100,14 +100,19 @@ with st.sidebar:
             "⚙️ Admin Panel",
         ],
     )
-    if st.session_state.chat_history:
-        st.markdown("---")
-        st.markdown("### 🧠 Recent Q&A")
-        for i, (q, a) in enumerate(st.session_state.chat_history[::-1][:5]):
-            if st.button(f"Q: {q[:40]}...", key=f"history_{i}"):
-                st.session_state.chat_input = q
+
+    # --- ChatGPT-style sidebar with 5 most recent user questions ---
     st.markdown("---")
-    # Bottom left upgrades button
+    st.markdown("#### Chats")
+    last_5 = [q for q, a in st.session_state.chat_history[-5:]]
+    if last_5:
+        for q in reversed(last_5):  # Most recent on top
+            st.markdown(f"<div style='padding:7px 0; font-size:16px;'>{q}</div>", unsafe_allow_html=True)
+    else:
+        st.markdown("<span style='color:#aaa;'>No chats yet</span>", unsafe_allow_html=True)
+    st.markdown("---")
+
+    # Only one Upgrades button (bottom of sidebar)
     if st.button("💼 Upgrades", use_container_width=True, key="sidebar_upgrade"):
         st.session_state["goto_upgrades"] = True
 
@@ -166,17 +171,6 @@ if nav == "💬 Chat with Council AI":
             with st.chat_message("ai"):
                 st.markdown(f"📩 **Auto-response from Wyndham Council:**\n\n{ai_reply}")
             st.session_state.chat_history.append((user_input, ai_reply))
-
-elif nav == "🧾 Topic FAQs":
-    st.subheader("FAQs by Topic")
-    topics = {
-        "Waste": ["How to report a missed bin?", "Where to get a new green bin?"],
-        "Pets": ["Is dog registration required?", "Off-leash park locations?"],
-        "Events": ["What’s on this weekend?", "How to book community rooms?"],
-    }
-    topic = st.selectbox("📂 Choose a category", list(topics.keys()))
-    for q in topics[topic]:
-        st.markdown(f"❓ {q}")
 
 elif nav == "📥 Submit a Request":
     st.markdown("📌 Redirecting to your council’s website.")
