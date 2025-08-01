@@ -135,25 +135,20 @@ def ask_ai(question, council):
     except Exception as e:
         return f"[Error] Could not answer: {str(e)}"
 
-
 def export_logs():
-    # Write chat history to a simple text file with proper newlines
+    # Write chat history to a simple text file with \n newlines (NO literal newlines)
     filename = f"chatlog_{st.session_state.session_start}.txt"
     with open(filename, "w") as f:
         for q, a in st.session_state.chat_history:
-            line = f"Q: {q}
-A: {a}
----
-"
-            f.write(line)
+            f.write("Q: " + str(q) + "\n")
+            f.write("A: " + str(a) + "\n")
+            f.write("---\n")
     return filename
-
 
 def log_feedback(text, email):
     # Append feedback entries to a simple log with newline separators
     with open("feedback_log.txt", "a") as f:
-        entry = f"{datetime.now().isoformat()} | {email or 'anon'} | {text}
-"
+        entry = f"{datetime.now().isoformat()} | {email or 'anon'} | {text}\n"
         f.write(entry)
 
 # === QUERY LIMIT CHECK ===
@@ -175,9 +170,7 @@ if nav == "💬 Chat with Council AI":
         with st.spinner("Wyndham GPT is replying..."):
             ai_reply = ask_ai(user_input, st.session_state.council)
             with st.chat_message("ai"):
-                st.markdown(f"📩 **Auto-response from Wyndham Council:**
-
-{ai_reply}")
+                st.markdown(f"📩 **Auto-response from Wyndham Council:**\n\n{ai_reply}")
             st.session_state.chat_history.append((user_input, ai_reply))
 
 elif nav == "🧾 Topic FAQs":
@@ -213,8 +206,7 @@ elif nav == "⬆️ Upgrades":
             st.subheader(title)
             price_col, _ = st.columns([1, 3])
             with price_col:
-                st.markdown(f"### ${price}  
-**USD / {period}**")
+                st.markdown(f"### ${price}  \n**USD / {period}**")
             st.markdown(tagline)
             st.button(cta_label, use_container_width=True)
             st.markdown("---")
