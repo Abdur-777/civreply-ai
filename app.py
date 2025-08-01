@@ -11,6 +11,10 @@ import email
 import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime
+from urllib.parse import urlparse, parse_qs
+import json
+import shutil
+import pandas as pd
 
 # Load environment variables
 load_dotenv()
@@ -20,163 +24,186 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "supersecret")
 GMAIL_USER = os.getenv("GMAIL_USER")
 GMAIL_PASS = os.getenv("GMAIL_PASS")
 
-# Email log store
-if "email_log" not in st.session_state:
-    st.session_state.email_log = []
+# Load council configs
+with open("council_config.json") as f:
+    COUNCIL_CONFIG = json.load(f)
 
-# Query count tracker
+# Extract council from URL or default
+query_params = st.query_params
+council_key = query_params.get("council", ["wyndham"])[0].lower().replace(" ", "_")
+council = council_key.title().replace("_", " ")
+config = COUNCIL_CONFIG.get(council_key, {})
+
+# Page setup
+st.set_page_config(page_title=f"CivReply AI - {council}", page_icon="\U0001F3DB️", layout="centered")
+
+# --- State Management ---
 if "query_count" not in st.session_state:
-    st.session_state.query_count = 0
-
-# Feedback store
+    st.session_state.query_count = {}
+if council_key not in st.session_state.query_count:
+    st.session_state.query_count[council_key] = 0
+if "email_log" not in st.session_state:
+    st.session_state.email_log = {}
+if council_key not in st.session_state.email_log:
+    st.session_state.email_log[council_key] = []
 if "feedback" not in st.session_state:
-    st.session_state.feedback = []
+    st.session_state.feedback = {}
+if council_key not in st.session_state.feedback:
+    st.session_state.feedback[council_key] = []
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
+if "user_auth" not in st.session_state:
+    st.session_state.user_auth = False
 
-st.set_page_config(page_title="CivReply AI", page_icon="\U0001F3DB️", layout="centered")
+# --- Admin Access ---
+with st.expander("🔐 Admin Login"):
+    if not st.session_state.is_admin:
+        admin_input = st.text_input("Enter Admin Password", type="password")
+        if admin_input == ADMIN_PASSWORD:
+            st.session_state.is_admin = True
+            st.success("✅ Admin access granted.")
+        elif admin_input:
+            st.error("❌ Incorrect password")
 
-# --- Auto-email Response Function ---
+# --- User Login ---
+with st.expander("👤 Council User Login"):
+    if not st.session_state.user_auth:
+        email_input = st.text_input("Enter your work email")
+        if st.button("Login"):
+            if email_input.endswith(f"@{council_key}.gov.au"):
+                st.session_state.user_auth = True
+                st.success("✅ Logged in as council user")
+            else:
+                st.error("❌ Invalid email domain for council")
+
+# --- Upload Interface for Admins ---
+if st.session_state.is_admin:
+    st.markdown("### 📤 Upload Council PDFs")
+    uploaded_files = st.file_uploader("Upload PDFs", type=["pdf"], accept_multiple_files=True)
+    if uploaded_files:
+        save_dir = f"docs/{council_key}"
+        index_dir = f"index/{council_key}"
+        os.makedirs(save_dir, exist_ok=True)
+
+        for f in os.listdir(save_dir):
+            os.remove(os.path.join(save_dir, f))
+        if os.path.exists(index_dir):
+            shutil.rmtree(index_dir)
+
+        for file in uploaded_files:
+            with open(os.path.join(save_dir, file.name), "wb") as f:
+                f.write(file.getbuffer())
+
+        loader = PyPDFDirectoryLoader(save_dir)
+        docs = loader.load()
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        split_docs = text_splitter.split_documents(docs)
+        embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+        db = FAISS.from_documents(split_docs, embeddings)
+        db.save_local(index_dir)
+
+        st.success(f"✅ Uploaded and indexed {len(uploaded_files)} file(s) for {council}")
+
+        st.markdown("### 🗂️ Uploaded Files")
+        for filename in os.listdir(save_dir):
+            st.write(filename)
+            if st.button(f"🗑 Delete {filename}", key=f"delete_{filename}"):
+                os.remove(os.path.join(save_dir, filename))
+                st.success(f"Deleted {filename}")
+
+# --- Email Sending ---
 def send_auto_email(recipient, question, answer):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     msg = MIMEText(f"""
-    <html>
-    <body>
+    <html><body>
       <h3 style='color:#3b82f6;'>Your CivReply AI Answer</h3>
       <p><strong>Question:</strong> {question}</p>
       <p><strong>Answer:</strong><br>{answer}</p>
-      <br>
       <p style='color:#6b7280;'>Sent at {now} from CivReply AI</p>
-    </body>
-    </html>
+    </body></html>
     """, "html")
-    msg["Subject"] = f"Your CivReply AI Answer: {question[:50]}"
+    msg["Subject"] = f"CivReply Answer: {question[:50]}"
     msg["From"] = GMAIL_USER
     msg["To"] = recipient
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(GMAIL_USER, GMAIL_PASS)
             server.send_message(msg)
-        st.session_state.email_log.append({"to": recipient, "question": question, "time": now})
+        st.session_state.email_log[council_key].append({"to": recipient, "question": question, "time": now})
         return True
     except Exception as e:
         st.error(f"Failed to send email: {e}")
         return False
 
-# --- Title ---
-st.markdown("""
-<style>
-  .main-title {
-    text-align: center;
-    font-size: 3rem;
-    font-weight: bold;
-    margin-top: 10px;
-    margin-bottom: 5px;
-  }
-</style>
-<div class="main-title">\U0001F3DB️ CivReply AI</div>
-""", unsafe_allow_html=True)
-
-# --- Council Config ---
-council_landing_config = {
-    "wyndham": {
-        "tagline": "Empowering Wyndham residents with smarter answers.",
-        "hero_image": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Wyndham_City_logo.png",
-        "about": "Wyndham Council provides planning, permits, bins, and more. CivReply AI helps you navigate them effortlessly."
-    }
-}
-
-# --- Council Dropdown ---
-councils = list(council_landing_config.keys())
-council = st.selectbox("Choose Council", [c.title().replace("_", " ") for c in councils])
-council_key = council.lower().replace(" ", "_")
-config = council_landing_config.get(council_key, {})
-hero_image = config.get("hero_image")
-tagline = config.get("tagline")
-about_text = config.get("about", "")
-
-# --- Plan Selector ---
-plan_choice = st.selectbox("Choose Plan", ["Basic", "Standard", "Enterprise"])
-st.session_state.plan = plan_choice.lower()
-
-# --- Plan Setup ---
-plan_limits = {
-    "basic": {"queries": 500, "users": 1, "email": True},
-    "standard": {"queries": 2000, "users": 5, "email": True},
-    "enterprise": {"queries": float("inf"), "users": 20, "email": True},
-}
-plan = st.session_state.plan
-plan_name = plan.capitalize()
-plan_queries = plan_limits[plan]["queries"]
-plan_users = plan_limits[plan]["users"]
-
-# --- Info Bars ---
+# --- Title + Branding ---
 st.markdown(f"""
-<div class="user-info-bar">🧑 Council: {council} | 🔐 Role: {'Admin' if st.session_state.get('is_admin') else 'Guest'}</div>
-<div class="plan-box">💼 Plan: {plan_name} – {'Unlimited' if plan_queries == float('inf') else f'{plan_queries}'} instant answers/month | {plan_users} seat(s) | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
+    <div style='text-align:center'>
+      <h1>\U0001F3DB️ CivReply AI – {council}</h1>
+      <img src="{config.get('hero_image')}" width="200" />
+      <p><em>{config.get('tagline')}</em></p>
+    </div>
 """, unsafe_allow_html=True)
 
-if about_text:
-    st.info(about_text)
+plan = config.get("plan", "basic")
+limits = {
+    "basic": {"queries": 500, "users": 1},
+    "standard": {"queries": 2000, "users": 5},
+    "enterprise": {"queries": float("inf"), "users": 20},
+}[plan]
 
-# --- Local Question Input ---
+st.markdown(f"""
+    <div style='background:#f1f5f9; padding:10px; border-left: 5px solid #3b82f6;'>
+    💼 Plan: <strong>{plan.capitalize()}</strong> | {limits['queries']} queries/mo | {limits['users']} seats
+    </div>
+""", unsafe_allow_html=True)
+
+st.info(config.get("about", "This council uses CivReply AI to assist residents with smarter answers."))
+
 st.markdown("### 🔍 Ask a local question:")
-user_question = st.text_input("Type your question here", placeholder="e.g., What day is bin collection in Wyndham?")
+user_question = st.text_input("Your question", placeholder="e.g., What day is bin collection?")
 user_email = st.text_input("Your email (optional)", placeholder="your@email.com")
 
-# --- Process Answer & Email ---
 if user_question:
-    if st.session_state.query_count < plan_queries:
-        st.session_state.query_count += 1
-        st.markdown("✅ Processing your question...")
+    if st.session_state.query_count[council_key] < limits["queries"]:
+        st.session_state.query_count[council_key] += 1
         llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY)
-        retriever = FAISS.load_local("index/wyndham/index.faiss", OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)).as_retriever()
+        index_path = f"index/{council_key}/index.faiss"
+        retriever = FAISS.load_local(index_path, OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)).as_retriever()
         qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
         answer = qa_chain.run(user_question)
         st.markdown(f"**Answer:** {answer}")
 
-        if user_email and plan_limits[plan]["email"]:
+        if user_email:
             if send_auto_email(user_email, user_question, answer):
                 st.success("✅ Answer sent to your email.")
 
-        # --- Feedback ---
         st.markdown("### 🙋 Feedback")
-        rating = st.slider("Rate your answer:", 1, 5, 3, key=f"rating_{st.session_state.query_count}")
-        emoji_display = "⭐" * rating
-        st.markdown(f"You rated: {emoji_display}")
-        comment = st.text_input("Any suggestions or notes?", key=f"comment_{st.session_state.query_count}")
+        feedback = st.radio("Was this helpful?", ["👍", "👎"], key=f"fb_{st.session_state.query_count[council_key]}")
+        comment = st.text_input("Any notes?", key=f"note_{st.session_state.query_count[council_key]}")
         if st.button("Submit Feedback"):
-            st.session_state.feedback.append({
+            st.session_state.feedback[council_key].append({
                 "question": user_question,
                 "answer": answer,
-                "rating": rating,
+                "feedback": feedback,
                 "comment": comment,
                 "time": datetime.now().isoformat()
             })
             st.success("🙏 Thanks for your feedback!")
+
     else:
-        st.error("❌ You've reached the maximum query limit for your plan.")
+        st.error("You’ve reached the max query limit for this council’s plan.")
 
-# --- FAQs ---
-faqs = {
-    "wyndham": [
-        ("How do I apply for a building permit?", "https://www.wyndham.vic.gov.au/services/building-planning/building/permits"),
-        ("When is bin collection day?", "https://www.wyndham.vic.gov.au/services/waste-recycling/bin-collection"),
-        ("Contact Wyndham Council", "https://www.wyndham.vic.gov.au/contact-us")
-    ]
-}
-if council_key in faqs:
-    st.markdown("### ❓ Frequently Asked Questions")
-    for question, link in faqs[council_key]:
-        st.markdown(f"- [{question}]({link})")
+if st.session_state.get("is_admin"):
+    if st.session_state.email_log[council_key]:
+        st.markdown("### 📬 Email Log")
+        df = pd.DataFrame(st.session_state.email_log[council_key])
+        st.dataframe(df)
+    if st.session_state.feedback[council_key]:
+        st.markdown("### 📣 Feedback Log")
+        df = pd.DataFrame(st.session_state.feedback[council_key])
+        st.dataframe(df)
 
-# --- Optional: Admin view email log ---
-if st.session_state.get("is_admin") and st.session_state.email_log:
-    st.markdown("### 📬 Email Log")
-    for log in st.session_state.email_log:
-        st.markdown(f"- [{log['time']}] Sent to **{log['to']}** | Question: _{log['question']}_")
-
-# --- Optional: Admin view feedback log ---
-if st.session_state.get("is_admin") and st.session_state.feedback:
-    st.markdown("### 📣 Feedback Log")
-    for item in st.session_state.feedback:
-        stars = "⭐" * item['rating']
-        st.markdown(f"- [{item['time']}] | Rating: {stars} | Q: _{item['question']}_ | Comment: {item['comment']}")
+    st.markdown("### 🧭 Council Audit Dashboard")
+    st.write("- Total Queries:", st.session_state.query_count[council_key])
+    st.write("- Total Emails Sent:", len(st.session_state.email_log[council_key]))
+    st.write("- Total Feedback Received:", len(st.session_state.feedback[council_key]))
