@@ -35,6 +35,22 @@ st.markdown("""
 <div class="main-title">\U0001F3DB️ CivReply AI</div>
 """, unsafe_allow_html=True)
 
+# --- Gmail Auto Reply Function ---
+def send_gmail_auto_reply(subject, message, to_email):
+    try:
+        msg = MIMEText(message, "plain")
+        msg["Subject"] = subject
+        msg["From"] = GMAIL_USER
+        msg["To"] = to_email
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(GMAIL_USER, GMAIL_PASS)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        st.error(f"Failed to send email: {e}")
+        return False
+
 # --- Default council config for early logo render ---
 council_landing_config = {
     "wyndham": {
@@ -128,13 +144,6 @@ if not st.session_state.is_admin:
     elif password:
         st.error("❌ Incorrect password")
 
-# --- File Uploader (Admin Only) ---
-if st.session_state.is_admin:
-    st.markdown("### 📤 Upload Council PDFs")
-    uploaded_files = st.file_uploader("Upload one or more PDF files", type=["pdf"], accept_multiple_files=True)
-    if uploaded_files:
-        st.success(f"Uploaded {len(uploaded_files)} file(s). (Processing logic goes here.)")
-
 # --- Council Dropdown ---
 councils = list(council_landing_config.keys())
 council = st.selectbox("Choose Council", [c.title().replace("_", " ") for c in councils])
@@ -160,34 +169,69 @@ plan_users = plan_limits[plan]["users"]
 # --- Info Bars ---
 st.markdown(f"""
 <div class="user-info-bar">🧑 Council: {council} | 🔐 Role: {'Admin' if st.session_state.is_admin else 'Guest'}</div>
-<div class="plan-box">💼 Plan: Smart Solo – {'Unlimited' if plan_queries == float('inf') else f'{plan_queries}'} instant answers/month | {plan_users} seat(s) | <a href='{STRIPE_LINK}' target='_blank' style='color:#3b82f6; text-decoration: underline;'>Upgrade →</a></div>
+<div class="plan-box">💼 Plan: Smart Solo – {'Unlimited' if plan_queries == float('inf') else f'{plan_queries}'} instant answers/month | {plan_users} seat(s) | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
 """, unsafe_allow_html=True)
 
-# --- Pricing Benefits Highlight ---
 st.markdown("""
-<div style="background-color: #f9fafb; border-left: 5px solid #3b82f6; padding: 16px 20px; border-radius: 8px; margin-top: 20px;">
-  <h4 style="margin-top: 0;">💡 What's included in the Basic Plan ($499/month):</h4>
-  <ul style="margin: 0 0 10px 0; padding-left: 20px;">
-    <li>✅ <strong>500 AI-powered queries</strong> per month</li>
-    <li>✅ <strong>PDF support</strong> – upload council documents for instant lookup</li>
-    <li>✅ <strong>24/7 smart assistant</strong> – no need to wait on hold</li>
-    <li>✅ <strong>1 user seat</strong> – ideal for reception, solo staff, or public counters</li>
+<div style="background-color: #f9fafb; border-left: 5px solid #3b82f6; padding: 15px; border-radius: 8px; margin-top: 10px;">
+  <strong>With the Basic Plan you get:</strong>
+  <ul>
+    <li>✅ 500 AI-powered queries per month</li>
+    <li>✅ PDF policy/document lookup (no need to search manually)</li>
+    <li>✅ 24/7 availability for council-related questions</li>
+    <li>✅ 1 user seat – perfect for solo operators, reception desks, or admin officers</li>
   </ul>
-  <em>Just $1 per query — and saves hours otherwise spent digging through council sites.</em>
+  <em>That’s just $1 per question – and 10x faster than calling or searching council websites.</em>
 </div>
 """, unsafe_allow_html=True)
 
-# --- Testimonial Card ---
 st.markdown("""
-<div style="background-color: #f3f4f6; border-left: 5px solid #10b981; padding: 15px; border-radius: 8px; font-style: italic; color: #374151; margin-top: 20px;">
-  “Our front desk saved 4 hours every week using CivReply AI. It’s like having a full-time assistant trained in council rules.”
-  <div style="margin-top: 10px; font-weight: bold; color: #111827;">— Local Government Staff Member</div>
+> 🗣️ <em>“Our front desk saved 4 hours every week using CivReply AI. It’s like having a full-time assistant trained in council rules.”</em><br>
+> — Local Government Staff Member
+""")
+
+st.markdown("""
+<div style="color: #1f2937; font-size: 0.95rem; margin-top: 10px;">
+  CivReply AI costs less than a single staff hour per month – yet it answers 500+ questions instantly.
 </div>
 """, unsafe_allow_html=True)
 
-# --- Final persuasive line ---
-st.markdown("""
-<div style="color: #1f2937; font-size: 0.95rem; margin-top: 16px;">
-  🕒 For less than the cost of one staff hour, CivReply answers 500+ questions — instantly.
-</div>
-""", unsafe_allow_html=True)
+if about_text:
+    st.info(about_text)
+
+# --- Local Question Input ---
+st.markdown("### 🔍 Ask a local question:")
+user_question = st.text_input("Type your question here", placeholder="e.g., What day is bin collection in Wyndham?")
+user_email = st.text_input("Your email (optional)", placeholder="e.g., info@counciluser.com")
+
+if user_question:
+    st.success("✅ Your question has been submitted.")
+    if user_email and "@" in user_email:
+        subject = "CivReply AI – We've received your question"
+        message = f"""Hi there,
+
+Thanks for using CivReply AI to ask:
+
+\"{user_question}\"
+
+Our AI is working on it and will respond right here in the app.
+
+If you need further assistance, reply to this email or contact your local council directly.
+
+– The CivReply AI Team
+"""
+        send_gmail_auto_reply(subject, message, user_email)
+
+# --- FAQs at Bottom ---
+faqs = {
+    "wyndham": [
+        ("How do I apply for a building permit?", "https://www.wyndham.vic.gov.au/services/building-planning/building/permits"),
+        ("When is bin collection day?", "https://www.wyndham.vic.gov.au/services/waste-recycling/bin-collection"),
+        ("Contact Wyndham Council", "https://www.wyndham.vic.gov.au/contact-us")
+    ]
+}
+
+if council_key in faqs:
+    st.markdown("### ❓ Frequently Asked Questions")
+    for question, link in faqs[council_key]:
+        st.markdown(f"- [{question}]({link})")
