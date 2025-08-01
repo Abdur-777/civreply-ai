@@ -39,39 +39,38 @@ st.session_state.setdefault("session_start", datetime.now().isoformat())
 st.session_state.setdefault("plan", "basic")
 st.session_state.setdefault("language", "English")
 
-# ===== Header (context bar with Language + Upgrades side-by-side) =====
-left, lang_col, upgrade_col = st.columns([3, 1, 1])
-with left:
-    st.markdown(
-        f"""
-        <div style='display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:16px'>
-          <span>🏛️ <strong>Active Council:</strong> {st.session_state.council}</span>
-          <span>|</span>
-          <span>💼 <strong>Plan:</strong> {PLAN_CONFIG[st.session_state.plan]['label']}</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-with lang_col:
-    st.markdown("🌐 Language")
+# ===== TITLE (center) =====
+st.markdown("<h1 style='text-align:center;margin-bottom:0.5em;'>CivReply AI</h1>", unsafe_allow_html=True)
+
+# ===== Controls row: Language | Role | Upgrades =====
+ctrl_cols = st.columns([2,2,2], gap="large")
+with ctrl_cols[0]:
+    st.markdown("🌐 <b>Language</b>", unsafe_allow_html=True)
     st.session_state.language = st.selectbox(
-        "Language",
+        "",
         options=["English", "Arabic", "Chinese", "Hindi", "Spanish"],
         index=["English", "Arabic", "Chinese", "Hindi", "Spanish"].index(st.session_state.language)
         if st.session_state.get("language") in ["English", "Arabic", "Chinese", "Hindi", "Spanish"]
         else 0,
         label_visibility="collapsed",
+        key="lang_selector"
     )
-with upgrade_col:
-    # Header quick-jump button to Upgrades view
-    if st.button("💼 Upgrades", use_container_width=True):
+with ctrl_cols[1]:
+    st.markdown("👤 <b>Select Role</b>", unsafe_allow_html=True)
+    st.session_state.user_role = st.selectbox(
+        "",
+        options=["Resident", "Staff", "Visitor"],
+        index=["Resident", "Staff", "Visitor"].index(st.session_state.get("user_role", "Resident")),
+        label_visibility="collapsed",
+        key="role_selector"
+    )
+with ctrl_cols[2]:
+    if st.button("💼 Upgrades", use_container_width=True, key="upgrade_header"):
         st.session_state["goto_upgrades"] = True
 
-# ===== Title =====
-st.title("CivReply AI")
-st.caption("Smarter answers for smarter communities.")
+st.markdown("---")
 
-# === SIDEBAR (ChatGPT-style threads + nav) ===
+# === SIDEBAR (Menu & chat history) ===
 with st.sidebar:
     st.image(
         "https://www.wyndham.vic.gov.au/sites/default/files/styles/small/public/2020-06/logo_0.png",
@@ -99,24 +98,15 @@ with st.sidebar:
         for i, (q, a) in enumerate(st.session_state.chat_history[::-1][:5]):
             if st.button(f"Q: {q[:40]}...", key=f"history_{i}"):
                 st.session_state.chat_input = q
+    st.markdown("---")
+    # Bottom left upgrades button (always visible)
+    if st.button("💼 Upgrades", use_container_width=True, key="sidebar_upgrade"):
+        st.session_state["goto_upgrades"] = True
 
-# Quick jump from header button
+# Quick jump from header or sidebar upgrades button
 if st.session_state.get("goto_upgrades"):
     nav = "⬆️ Upgrades"
     st.session_state["goto_upgrades"] = False
-
-# ===== Role selector centered (Resident in the middle) =====
-st.markdown("#### 👤 Role")
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-    st.session_state.user_role = st.selectbox(
-        "Select Role",
-        options=["Resident", "Staff", "Visitor"],
-        index=["Resident", "Staff", "Visitor"].index(st.session_state.get("user_role", "Resident")),
-        help="Your role helps tailor answers and available actions.",
-    )
-
-st.divider()
 
 # === FUNCTIONS ===
 
@@ -227,23 +217,7 @@ elif nav == "⬆️ Upgrades":
                 "Use on web and mobile",
             ],
         )
-    else:  # Business
-        plan_card(
-            title="Team",
-            price="25",
-            period="month",
-            tagline="Supercharge your team's work with a secure, collaborative workspace.",
-            cta_label="Add Team workspace",
-            features=[
-                "Everything in Plus, access to advanced models and higher limits",
-                "Connect company knowledge: Google Drive, SharePoint, Dropbox, GitHub, Outlook",
-                "Business security: SSO, MFA, encryption in transit & at rest",
-                "Record mode: capture meetings and notes on desktop, searchable transcripts",
-                "Workspace features: projects, tasks, file uploads, custom workspace GPTs",
-                "Built-in agents that can reason across docs, tools, and codebases",
-            ],
-        )
-
+    else:  # Business — remove Team, keep three business tiers
         st.subheader("Compare business tiers")
         cols = st.columns(3)
         with cols[0]:
