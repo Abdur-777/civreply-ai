@@ -28,7 +28,7 @@ if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
 
 if "plan" not in st.session_state:
-    st.session_state.plan = "basic"  # Change to "standard" or "enterprise" as needed
+    st.session_state.plan = "basic"
 
 if "query_count" not in st.session_state:
     st.session_state.query_count = 0
@@ -64,6 +64,26 @@ plan_name = st.session_state.plan.capitalize()
 plan_queries = plan_limits[st.session_state.plan]["queries"]
 plan_users = plan_limits[st.session_state.plan]["users"]
 
+# --- Council Custom Content ---
+council_landing_config = {
+    "wyndham": {
+        "tagline": "Empowering Wyndham residents with smarter answers.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Wyndham_City_logo.png",
+        "about": "Wyndham Council provides planning, permits, bins, and more. CivReply AI helps you navigate them effortlessly."
+    },
+    "melbourne": {
+        "tagline": "Your personal assistant for City of Melbourne policies.",
+        "hero_image": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/City_of_Melbourne_logo.svg/2560px-City_of_Melbourne_logo.svg.png",
+        "about": "Discover services, permits, and events across central Melbourne—instantly."
+    },
+    # Add more as needed
+}
+
+config = council_landing_config.get(council_key, {})
+tagline = config.get("tagline", f"Ask {council} Council anything – policies, laws, documents.")
+hero_image = config.get("hero_image")
+about_text = config.get("about", "")
+
 # --- Branding ---
 st.markdown(f"""
 <style>
@@ -79,119 +99,17 @@ st.markdown(f"""
   <div style="font-size: 2rem;">\U0001F3DB️</div>
   <h1>CivReply AI</h1>
 </div>
-<div class="tagline">Ask {council} Council anything – policies, laws, documents.</div>
+""", unsafe_allow_html=True)
+
+if hero_image:
+    st.image(hero_image, use_column_width=True)
+
+st.markdown(f"""
+<div class="tagline">{tagline}</div>
 <div class="user-info-bar">\U0001F9D1 Council: {council} | 🔐 Role: {'Admin' if st.session_state.is_admin else 'Guest'}</div>
 <div class="plan-box">\U0001F4E6 Plan: {plan_name} – {'Unlimited' if plan_queries == float('inf') else f'{plan_queries}'} queries/month | {plan_users} user(s) | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
 <div class="question-label">🔍 Ask a local question:</div>
 """, unsafe_allow_html=True)
 
-# --- Input UI ---
-question = st.text_input("e.g. Do I need a permit to cut down a tree?", key="question_box", label_visibility="collapsed")
-
-# --- Load Vector Index ---
-try:
-    db = FAISS.load_local(index_path, OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY), allow_dangerous_deserialization=True)
-    retriever = db.as_retriever()
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=ChatOpenAI(model="gpt-4", openai_api_key=OPENAI_API_KEY),
-        retriever=retriever,
-        return_source_documents=True
-    )
-except Exception as e:
-    st.error(f"❌ Could not load index for {council}: {str(e)}")
-    st.stop()
-
-# --- Handle Question ---
-if question:
-    if st.session_state.query_count >= plan_queries:
-        st.error("🚫 You’ve reached your monthly query limit. Please upgrade your plan.")
-        st.stop()
-
-    st.session_state.query_count += 1
-    st.write("🔎 Searching documents...")
-    try:
-        result = qa_chain({"query": question})
-        st.success(result["result"])
-        with st.expander("📄 View sources"):
-            for doc in result["source_documents"]:
-                st.caption(f"• {doc.metadata.get('source', 'Unknown source')}")
-    except Exception as e:
-        st.error(f"❌ Error: {str(e)}")
-
-# --- PDF Upload + FAISS Rebuild ---
-def process_and_index_directory(data_dir):
-    loader = PyPDFDirectoryLoader(data_dir)
-    docs = loader.load()
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    split_docs = splitter.split_documents(docs)
-    embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
-    faiss_index = FAISS.from_documents(split_docs, embeddings)
-    faiss_index.save_local(index_path)
-
-if st.session_state.is_admin:
-    uploaded_files = st.file_uploader(f"📤 Upload PDFs for {council}", type="pdf", accept_multiple_files=True)
-    if uploaded_files:
-        for file in uploaded_files:
-            with open(os.path.join(data_path, file.name), "wb") as f:
-                f.write(file.getbuffer())
-        st.success("✅ Files uploaded. Now click below to rebuild the index.")
-
-    if st.button("🔄 Rebuild Index"):
-        try:
-            process_and_index_directory(data_path)
-            st.success(f"✅ Index for {council} rebuilt.")
-            st.experimental_rerun()
-        except Exception as e:
-            st.error(f"❌ Failed to rebuild index: {str(e)}")
-
-# --- Gmail Auto-Reply with GPT ---
-def gmail_auto_reply():
-    try:
-        imap = imaplib.IMAP4_SSL("imap.gmail.com")
-        imap.login(GMAIL_USER, GMAIL_PASS)
-        imap.select("inbox")
-        status, messages = imap.search(None, 'UNSEEN')
-
-        for num in messages[0].split():
-            _, data = imap.fetch(num, "(RFC822)")
-            raw_email = data[0][1]
-            msg = email.message_from_bytes(raw_email)
-            sender = email.utils.parseaddr(msg['From'])[1]
-            subject = msg['Subject']
-            body = ""
-            if msg.is_multipart():
-                for part in msg.walk():
-                    if part.get_content_type() == "text/plain":
-                        body = part.get_payload(decode=True).decode()
-                        break
-            else:
-                body = msg.get_payload(decode=True).decode()
-
-            prompt = f"You are an AI assistant replying to a council inquiry email. The email says: '{body}'. Write a professional and helpful reply."
-            reply = ChatOpenAI(model="gpt-4", openai_api_key=OPENAI_API_KEY).invoke(prompt)
-
-            reply_msg = MIMEText(reply)
-            reply_msg["Subject"] = f"Re: {subject}"
-            reply_msg["From"] = GMAIL_USER
-            reply_msg["To"] = sender
-
-            smtp = smtplib.SMTP_SSL("smtp.gmail.com", 465)
-            smtp.login(GMAIL_USER, GMAIL_PASS)
-            smtp.sendmail(GMAIL_USER, sender, reply_msg.as_string())
-            smtp.quit()
-
-        imap.logout()
-        st.success("✅ Auto-replied to all unread emails.")
-    except Exception as e:
-        st.error(f"❌ Gmail auto-reply failed: {str(e)}")
-
-if st.session_state.is_admin and st.button("📬 Auto-Reply to Council Emails"):
-    gmail_auto_reply()
-
-# --- Footer ---
-st.markdown(f"""
-<div class="footer">
-  ⚙️ Powered by LangChain + GPT-4 | Queries used: {st.session_state.query_count} / {plan_queries if plan_queries != float('inf') else '∞'}<br>
-  📬 Contact: <a href=\"mailto:contact@civreply.ai\">contact@civreply.ai</a>
-</div>
-""", unsafe_allow_html=True)
+if about_text:
+    st.info(about_text)
