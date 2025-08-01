@@ -39,7 +39,7 @@ st.session_state.setdefault("session_start", datetime.now().isoformat())
 st.session_state.setdefault("plan", "basic")
 st.session_state.setdefault("language", "English")
 
-# ===== Header (context bar with Language + Upgrade side-by-side) =====
+# ===== Header (context bar with Language + Upgrades side-by-side) =====
 left, lang_col, upgrade_col = st.columns([3, 1, 1])
 with left:
     st.markdown(
@@ -63,14 +63,9 @@ with lang_col:
         label_visibility="collapsed",
     )
 with upgrade_col:
-    try:
-        st.page_link("pages/upgrade_plan.py", label="💼 Upgrade Plan", use_container_width=True)
-    except Exception:
-        if st.button("💼 Upgrade Plan", use_container_width=True):
-            try:
-                st.switch_page("pages/upgrade_plan.py")
-            except Exception:
-                st.info("Create `pages/upgrade_plan.py` to enable the Upgrade Plan page.")
+    # Header quick-jump button to Upgrades view
+    if st.button("💼 Upgrades", use_container_width=True):
+        st.session_state["goto_upgrades"] = True
 
 # ===== Title =====
 st.title("CivReply AI")
@@ -89,6 +84,7 @@ with st.sidebar:
             "💬 Chat with Council AI",
             "🧾 Topic FAQs",
             "📥 Submit a Request",
+            "⬆️ Upgrades",
             "📊 Stats & Session",
             "📤 Export Logs",
             "💡 Share Feedback",
@@ -104,13 +100,18 @@ with st.sidebar:
             if st.button(f"Q: {q[:40]}...", key=f"history_{i}"):
                 st.session_state.chat_input = q
 
+# Quick jump from header button
+if st.session_state.get("goto_upgrades"):
+    nav = "⬆️ Upgrades"
+    st.session_state["goto_upgrades"] = False
+
 # ===== Role selector centered (Resident in the middle) =====
 st.markdown("#### 👤 Role")
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     st.session_state.user_role = st.selectbox(
         "Select Role",
-        options=["Resident", "Staff", "Visitor"],  # per v2.3 (Business Owner removed)
+        options=["Resident", "Staff", "Visitor"],
         index=["Resident", "Staff", "Visitor"].index(st.session_state.get("user_role", "Resident")),
         help="Your role helps tailor answers and available actions.",
     )
@@ -136,20 +137,24 @@ def ask_ai(question, council):
 
 
 def export_logs():
+    # Write chat history to a simple text file with proper newlines
     filename = f"chatlog_{st.session_state.session_start}.txt"
     with open(filename, "w") as f:
         for q, a in st.session_state.chat_history:
-            f.write(f"Q: {q}
+            line = f"Q: {q}
 A: {a}
 ---
-")
+"
+            f.write(line)
     return filename
 
 
 def log_feedback(text, email):
+    # Append feedback entries to a simple log with newline separators
     with open("feedback_log.txt", "a") as f:
-        f.write(f"{datetime.now().isoformat()} | {email or 'anon'} | {text}
-")
+        entry = f"{datetime.now().isoformat()} | {email or 'anon'} | {text}
+"
+        f.write(entry)
 
 # === QUERY LIMIT CHECK ===
 plan_id = st.session_state.plan
@@ -189,6 +194,75 @@ elif nav == "🧾 Topic FAQs":
 elif nav == "📥 Submit a Request":
     st.markdown("📌 Redirecting to your council’s website.")
     st.link_button("📝 Submit Online", "https://www.wyndham.vic.gov.au/request-it")
+
+elif nav == "⬆️ Upgrades":
+    st.title("Upgrade your plan")
+
+    # Segmented toggle (Personal | Business)
+    mode = st.segmented_control(
+        "Choose plan type",
+        options=["Personal", "Business"],
+        default="Business",
+    )
+
+    st.write("")
+
+    # Plan card helper
+    def plan_card(title, price, period, tagline, cta_label, features):
+        with st.container(border=True):
+            st.subheader(title)
+            price_col, _ = st.columns([1, 3])
+            with price_col:
+                st.markdown(f"### ${price}  
+**USD / {period}**")
+            st.markdown(tagline)
+            st.button(cta_label, use_container_width=True)
+            st.markdown("---")
+            for f in features:
+                st.markdown(f"- {f}")
+
+    if mode == "Personal":
+        plan_card(
+            title="Plus",
+            price="20",
+            period="month",
+            tagline="Great for power users who want faster answers and longer context.",
+            cta_label="Upgrade to Plus",
+            features=[
+                "Priority compute and faster responses",
+                "Access to advanced models",
+                "Larger context for longer chats",
+                "Use on web and mobile",
+            ],
+        )
+    else:  # Business
+        plan_card(
+            title="Team",
+            price="25",
+            period="month",
+            tagline="Supercharge your team's work with a secure, collaborative workspace.",
+            cta_label="Add Team workspace",
+            features=[
+                "Everything in Plus, access to advanced models and higher limits",
+                "Connect company knowledge: Google Drive, SharePoint, Dropbox, GitHub, Outlook",
+                "Business security: SSO, MFA, encryption in transit & at rest",
+                "Record mode: capture meetings and notes on desktop, searchable transcripts",
+                "Workspace features: projects, tasks, file uploads, custom workspace GPTs",
+                "Built-in agents that can reason across docs, tools, and codebases",
+            ],
+        )
+
+        st.subheader("Compare business tiers")
+        cols = st.columns(3)
+        with cols[0]:
+            plan_card("Basic", "499", "month", "For small teams getting started.",
+                      "Choose Basic", ["PDF Q&A", "Limit: 500 queries"])
+        with cols[1]:
+            plan_card("Standard", "1499", "month", "Scale insights across your council.",
+                      "Choose Standard", ["PDF Q&A", "Form Scraping", "Limit: 2000 queries"])
+        with cols[2]:
+            plan_card("Enterprise", "2999+", "month", "For large organizations that need controls and scale.",
+                      "Contact Sales", ["All Features", "Limit: Unlimited queries"])
 
 elif nav == "📊 Stats & Session":
     st.metric("Total Questions", st.session_state.query_count)
@@ -238,5 +312,3 @@ elif nav == "⚙️ Admin Panel":
                 st.success("✅ Index rebuilt successfully.")
             else:
                 st.warning("Please upload at least one document.")
-
-# NOTE: Tier cards / plan comparison have been moved to `pages/upgrade_plan.py` per earlier design.
