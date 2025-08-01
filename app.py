@@ -21,7 +21,7 @@ GMAIL_PASS = os.getenv("GMAIL_PASS")
 
 st.set_page_config(page_title="CivReply AI", page_icon="\U0001F3DB️", layout="centered")
 
-# --- Title at very top ---
+# --- Title ---
 st.markdown("""
 <style>
   .main-title {
@@ -35,114 +35,15 @@ st.markdown("""
 <div class="main-title">\U0001F3DB️ CivReply AI</div>
 """, unsafe_allow_html=True)
 
-# --- Gmail Auto Reply Function ---
-def send_gmail_auto_reply(subject, message, to_email):
-    try:
-        msg = MIMEText(message, "plain")
-        msg["Subject"] = subject
-        msg["From"] = GMAIL_USER
-        msg["To"] = to_email
-
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_USER, GMAIL_PASS)
-            server.send_message(msg)
-        return True
-    except Exception as e:
-        st.error(f"Failed to send email: {e}")
-        return False
-
-# --- Default council config for early logo render ---
+# --- Council Config ---
 council_landing_config = {
     "wyndham": {
         "tagline": "Empowering Wyndham residents with smarter answers.",
         "hero_image": "https://upload.wikimedia.org/wikipedia/commons/1/1d/Wyndham_City_logo.png",
         "about": "Wyndham Council provides planning, permits, bins, and more. CivReply AI helps you navigate them effortlessly."
-    },
-    "brimbank": {
-        "tagline": "Smart answers for Brimbank locals.",
-        "hero_image": "https://upload.wikimedia.org/wikipedia/en/6/65/Brimbank_City_Council_logo.png",
-        "about": "Your AI-powered guide to waste collection, parking, development, and more in Brimbank."
-    },
-    "hobsons_bay": {
-        "tagline": "Navigate Hobsons Bay Council with ease.",
-        "hero_image": "https://upload.wikimedia.org/wikipedia/en/f/f1/Hobsons_Bay_City_Council_logo.png",
-        "about": "Explore building permits, community services, and environment info powered by CivReply AI."
-    },
-    "yarra": {
-        "tagline": "Yarra Council services, now at your fingertips.",
-        "hero_image": "https://upload.wikimedia.org/wikipedia/en/f/f3/City_of_Yarra_logo.png",
-        "about": "From community programs to local laws—explore all that Yarra offers with CivReply AI."
-    },
-    "moreland": {
-        "tagline": "Simplifying Moreland’s services with AI.",
-        "hero_image": "https://upload.wikimedia.org/wikipedia/en/2/2f/Moreland_City_Council_logo.png",
-        "about": "Your go-to assistant for understanding Moreland’s policies, recycling, and community grants."
-    },
-    "darebin": {
-        "tagline": "Answers for Darebin residents, instantly.",
-        "hero_image": "https://upload.wikimedia.org/wikipedia/en/2/29/Darebin_City_Council_logo.png",
-        "about": "AI-powered access to Darebin Council services, forms, and waste schedules."
-    },
-    "boroondara": {
-        "tagline": "Explore Boroondara with clarity and confidence.",
-        "hero_image": "https://upload.wikimedia.org/wikipedia/en/5/55/City_of_Boroondara_Logo.png",
-        "about": "Everything from permits to planning in Boroondara—smartly answered."
-    },
-    "stonnington": {
-        "tagline": "Stonnington Council guidance made easy.",
-        "hero_image": "https://upload.wikimedia.org/wikipedia/en/e/eb/City_of_Stonnington_logo.png",
-        "about": "Your streamlined AI interface to council services, local laws, and event info."
-    },
-    "port_phillip": {
-        "tagline": "Port Phillip AI assistant for all services.",
-        "hero_image": "https://upload.wikimedia.org/wikipedia/en/b/bc/City_of_Port_Phillip_logo.png",
-        "about": "Find what you need about permits, parking, and arts programs across Port Phillip."
-    },
-    "hume": {
-        "tagline": "Helping Hume residents with everyday council queries.",
-        "hero_image": "https://upload.wikimedia.org/wikipedia/en/5/5e/Hume_City_Council_logo.png",
-        "about": "Access services, permits, and updates for Hume City with CivReply AI."
     }
+    # Add others as needed
 }
-
-# Set default council logo and tagline
-default_council = "Wyndham"
-default_key = default_council.lower().replace(" ", "_")
-default_config = council_landing_config.get(default_key, {})
-hero_image = default_config.get("hero_image")
-tagline = default_config.get("tagline")
-
-# --- Council Logo & Tagline ---
-st.markdown(f"""
-<style>
-  .header {{
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: 20px;
-  }}
-  .tagline {{
-    text-align: center;
-    font-size: 1.1rem;
-    color: #555;
-    margin-bottom: 20px;
-  }}
-</style>
-<div class="header">
-  <div class="tagline">{tagline}</div>
-</div>
-""", unsafe_allow_html=True)
-
-# --- Admin Access ---
-if "is_admin" not in st.session_state:
-    st.session_state.is_admin = False
-if not st.session_state.is_admin:
-    password = st.text_input("Enter Admin Password to Enable Upload", type="password")
-    if password == ADMIN_PASSWORD:
-        st.session_state.is_admin = True
-        st.success("✅ Admin access granted.")
-    elif password:
-        st.error("❌ Incorrect password")
 
 # --- Council Dropdown ---
 councils = list(council_landing_config.keys())
@@ -153,14 +54,16 @@ hero_image = config.get("hero_image")
 tagline = config.get("tagline")
 about_text = config.get("about", "")
 
+# --- Plan Selector ---
+plan_choice = st.selectbox("Choose Plan", ["Basic", "Standard", "Enterprise"])
+st.session_state.plan = plan_choice.lower()
+
 # --- Plan Setup ---
 plan_limits = {
     "basic": {"queries": 500, "users": 1},
     "standard": {"queries": 2000, "users": 5},
     "enterprise": {"queries": float("inf"), "users": 20},
 }
-if "plan" not in st.session_state:
-    st.session_state.plan = "basic"
 plan = st.session_state.plan
 plan_name = plan.capitalize()
 plan_queries = plan_limits[plan]["queries"]
@@ -168,31 +71,72 @@ plan_users = plan_limits[plan]["users"]
 
 # --- Info Bars ---
 st.markdown(f"""
-<div class="user-info-bar">🧑 Council: {council} | 🔐 Role: {'Admin' if st.session_state.is_admin else 'Guest'}</div>
-<div class="plan-box">💼 Plan: Smart Solo – {'Unlimited' if plan_queries == float('inf') else f'{plan_queries}'} instant answers/month | {plan_users} seat(s) | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
+<div class="user-info-bar">🧑 Council: {council} | 🔐 Role: {'Admin' if st.session_state.get('is_admin') else 'Guest'}</div>
+<div class="plan-box">💼 Plan: {plan_name} – {'Unlimited' if plan_queries == float('inf') else f'{plan_queries}'} instant answers/month | {plan_users} seat(s) | <a href='{STRIPE_LINK}' target='_blank'>Upgrade →</a></div>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-<div style="background-color: #f9fafb; border-left: 5px solid #3b82f6; padding: 15px; border-radius: 8px; margin-top: 10px;">
-  <strong>With the Basic Plan you get:</strong>
-  <ul>
-    <li>✅ 500 AI-powered queries per month</li>
-    <li>✅ PDF policy/document lookup (no need to search manually)</li>
-    <li>✅ 24/7 availability for council-related questions</li>
-    <li>✅ 1 user seat – perfect for solo operators, reception desks, or admin officers</li>
-  </ul>
-  <em>That’s just $1 per question – and 10x faster than calling or searching council websites.</em>
-</div>
-""", unsafe_allow_html=True)
+if plan == "basic":
+    st.markdown("""
+    <div style="background-color: #f9fafb; border-left: 5px solid #3b82f6; padding: 15px; border-radius: 8px; margin-top: 10px;">
+      <strong>With the Basic Plan you get:</strong>
+      <ul>
+        <li>✅ 500 AI-powered queries per month</li>
+        <li>✅ PDF policy/document lookup (no need to search manually)</li>
+        <li>✅ 24/7 availability for council-related questions</li>
+        <li>✅ 1 user seat – perfect for solo operators, reception desks, or admin officers</li>
+      </ul>
+      <em>That’s just $1 per question – and 10x faster than calling or searching council websites.</em>
+    </div>
+    """, unsafe_allow_html=True)
 
-st.markdown("""
-> 🗣️ <em>“Our front desk saved 4 hours every week using CivReply AI. It’s like having a full-time assistant trained in council rules.”</em><br>
-> — Local Government Staff Member
-""")
+    st.markdown("""
+    > 🗣️ <em>“Our front desk saved 4 hours every week using CivReply AI. It’s like having a full-time assistant trained in council rules.”</em><br>
+    > — Local Government Staff Member
+    """)
+
+elif plan == "standard":
+    st.markdown("""
+    <div style="background-color: #f9fafb; border-left: 5px solid #3b82f6; padding: 15px; border-radius: 8px; margin-top: 10px;">
+      <strong>With the Standard Plan you get:</strong>
+      <ul>
+        <li>✅ 2,000 AI-powered queries per month</li>
+        <li>✅ Upload custom council documents and PDFs</li>
+        <li>✅ 5 user seats – ideal for departments and offices</li>
+        <li>✅ PDF policy/document lookup</li>
+        <li>✅ 24/7 availability for council-related questions</li>
+      </ul>
+      <em>Standard plan saves time across teams – and gives faster access to policy answers than staff alone.</em>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    > 🗣️ <em>“Our planning department uses CivReply AI to onboard new staff faster and reduce public enquiries.”</em><br>
+    > — Local Government IT Manager
+    """)
+
+elif plan == "enterprise":
+    st.markdown("""
+    <div style="background-color: #f9fafb; border-left: 5px solid #10b981; padding: 15px; border-radius: 8px; margin-top: 10px;">
+      <strong>With the Enterprise Plan you get:</strong>
+      <ul>
+        <li>✅ Unlimited AI-powered queries per month</li>
+        <li>✅ Upload and manage multiple council databases</li>
+        <li>✅ 20+ user seats for large teams or entire departments</li>
+        <li>✅ Priority support and custom integrations</li>
+        <li>✅ 24/7 availability and analytics dashboard</li>
+      </ul>
+      <em>Enterprise plan powers entire councils with secure, AI-enhanced service delivery.</em>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    > 🏛️ <em>“We reduced public phone calls by 70% and empowered our team with CivReply Enterprise.”</em><br>
+    > — Municipal Transformation Officer
+    """)
 
 st.markdown("""
 <div style="color: #1f2937; font-size: 0.95rem; margin-top: 10px;">
-  CivReply AI costs less than a single staff hour per month – yet it answers 500+ questions instantly.
+  CivReply AI is your always-on council knowledge assistant – now with team collaboration support.
 </div>
 """, unsafe_allow_html=True)
 
@@ -202,27 +146,9 @@ if about_text:
 # --- Local Question Input ---
 st.markdown("### 🔍 Ask a local question:")
 user_question = st.text_input("Type your question here", placeholder="e.g., What day is bin collection in Wyndham?")
-user_email = st.text_input("Your email (optional)", placeholder="e.g., info@counciluser.com")
+user_email = st.text_input("Your email (optional)", placeholder="your@email.com")
 
-if user_question:
-    st.success("✅ Your question has been submitted.")
-    if user_email and "@" in user_email:
-        subject = "CivReply AI – We've received your question"
-        message = f"""Hi there,
-
-Thanks for using CivReply AI to ask:
-
-\"{user_question}\"
-
-Our AI is working on it and will respond right here in the app.
-
-If you need further assistance, reply to this email or contact your local council directly.
-
-– The CivReply AI Team
-"""
-        send_gmail_auto_reply(subject, message, user_email)
-
-# --- FAQs at Bottom ---
+# --- FAQs ---
 faqs = {
     "wyndham": [
         ("How do I apply for a building permit?", "https://www.wyndham.vic.gov.au/services/building-planning/building/permits"),
@@ -230,7 +156,6 @@ faqs = {
         ("Contact Wyndham Council", "https://www.wyndham.vic.gov.au/contact-us")
     ]
 }
-
 if council_key in faqs:
     st.markdown("### ❓ Frequently Asked Questions")
     for question, link in faqs[council_key]:
