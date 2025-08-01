@@ -14,7 +14,6 @@ from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 import json
 import shutil
-import pandas as pd
 
 # Load environment variables
 load_dotenv()
@@ -38,18 +37,12 @@ config = COUNCIL_CONFIG.get(council_key, {})
 st.set_page_config(page_title=f"CivReply AI - {council}", page_icon="\U0001F3DB️", layout="centered")
 
 # --- State Management ---
-if "query_count" not in st.session_state:
-    st.session_state.query_count = {}
-if council_key not in st.session_state.query_count:
-    st.session_state.query_count[council_key] = 0
-if "email_log" not in st.session_state:
-    st.session_state.email_log = {}
-if council_key not in st.session_state.email_log:
-    st.session_state.email_log[council_key] = []
-if "feedback" not in st.session_state:
-    st.session_state.feedback = {}
-if council_key not in st.session_state.feedback:
-    st.session_state.feedback[council_key] = []
+for state_key in ["query_count", "email_log", "feedback", "users"]:
+    if state_key not in st.session_state:
+        st.session_state[state_key] = {}
+    if council_key not in st.session_state[state_key]:
+        st.session_state[state_key][council_key] = [] if state_key != "query_count" else 0
+
 if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
 if "user_auth" not in st.session_state:
@@ -85,6 +78,7 @@ if st.session_state.is_admin:
         index_dir = f"index/{council_key}"
         os.makedirs(save_dir, exist_ok=True)
 
+        # Clear old files and index for overwrite
         for f in os.listdir(save_dir):
             os.remove(os.path.join(save_dir, f))
         if os.path.exists(index_dir):
@@ -135,7 +129,7 @@ def send_auto_email(recipient, question, answer):
         st.error(f"Failed to send email: {e}")
         return False
 
-# --- Title + Branding ---
+# --- Branding ---
 st.markdown(f"""
     <div style='text-align:center'>
       <h1>\U0001F3DB️ CivReply AI – {council}</h1>
@@ -189,21 +183,31 @@ if user_question:
                 "time": datetime.now().isoformat()
             })
             st.success("🙏 Thanks for your feedback!")
-
     else:
         st.error("You’ve reached the max query limit for this council’s plan.")
 
-if st.session_state.get("is_admin"):
-    if st.session_state.email_log[council_key]:
-        st.markdown("### 📬 Email Log")
-        df = pd.DataFrame(st.session_state.email_log[council_key])
-        st.dataframe(df)
-    if st.session_state.feedback[council_key]:
-        st.markdown("### 📣 Feedback Log")
-        df = pd.DataFrame(st.session_state.feedback[council_key])
-        st.dataframe(df)
+if st.session_state.is_admin:
+    st.markdown("## 📊 Admin Dashboard")
+    st.write("**Total queries:**", st.session_state.query_count[council_key])
+    st.write("**Emails sent:**", len(st.session_state.email_log[council_key]))
+    st.write("**Feedback count:**", len(st.session_state.feedback[council_key]))
 
-    st.markdown("### 🧭 Council Audit Dashboard")
-    st.write("- Total Queries:", st.session_state.query_count[council_key])
-    st.write("- Total Emails Sent:", len(st.session_state.email_log[council_key]))
-    st.write("- Total Feedback Received:", len(st.session_state.feedback[council_key]))
+    st.markdown("### 👥 Team Management")
+    new_user = st.text_input("Invite user (email ending with @gov.au)")
+    if st.button("Add user"):
+        if new_user.endswith("@gov.au") and new_user not in st.session_state.users[council_key]:
+            st.session_state.users[council_key].append(new_user)
+            st.success(f"✅ Added {new_user} to the council users list.")
+    if st.session_state.users[council_key]:
+        for u in st.session_state.users[council_key]:
+            if st.button(f"Remove {u}", key=f"rm_{u}"):
+                st.session_state.users[council_key].remove(u)
+                st.success(f"Removed {u}")
+
+    st.markdown("### 📬 Email Log")
+    for log in st.session_state.email_log[council_key]:
+        st.markdown(f"- [{log['time']}] Sent to {log['to']} | Q: _{log['question']}_")
+
+    st.markdown("### 📣 Feedback Log")
+    for item in st.session_state.feedback[council_key]:
+        st.markdown(f"- [{item['time']}] {item['feedback']} | Q: _{item['question']}_ | {item['comment']}")
