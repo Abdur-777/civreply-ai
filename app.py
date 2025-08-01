@@ -34,22 +34,35 @@ council = council_key.title().replace("_", " ")
 config = COUNCIL_CONFIG.get(council_key, {})
 
 # Page setup
-st.set_page_config(page_title=f"CivReply AI - {council}", page_icon="\U0001F3DB️", layout="centered")
+st.set_page_config(page_title=f"CivReply AI - {council}", page_icon="\U0001F3DB️", layout="wide")
 
 # --- State Management ---
-for state_key in ["query_count", "email_log", "feedback", "users"]:
-    if state_key not in st.session_state:
-        st.session_state[state_key] = {}
-    if council_key not in st.session_state[state_key]:
-        st.session_state[state_key][council_key] = [] if state_key != "query_count" else 0
-
+if "query_count" not in st.session_state:
+    st.session_state.query_count = {}
+if council_key not in st.session_state.query_count:
+    st.session_state.query_count[council_key] = 0
+if "email_log" not in st.session_state:
+    st.session_state.email_log = {}
+if council_key not in st.session_state.email_log:
+    st.session_state.email_log[council_key] = []
+if "feedback" not in st.session_state:
+    st.session_state.feedback = {}
+if council_key not in st.session_state.feedback:
+    st.session_state.feedback[council_key] = []
+if "history" not in st.session_state:
+    st.session_state.history = {}
+if council_key not in st.session_state.history:
+    st.session_state.history[council_key] = []
 if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
 if "user_auth" not in st.session_state:
     st.session_state.user_auth = False
 
+# --- Layout Columns ---
+left, center, right = st.columns([1, 2, 1])
+
 # --- Admin Access ---
-with st.expander("🔐 Admin Login"):
+with left.expander("🔐 Admin Login"):
     if not st.session_state.is_admin:
         admin_input = st.text_input("Enter Admin Password", type="password")
         if admin_input == ADMIN_PASSWORD:
@@ -59,7 +72,7 @@ with st.expander("🔐 Admin Login"):
             st.error("❌ Incorrect password")
 
 # --- User Login ---
-with st.expander("👤 Council User Login"):
+with left.expander("👤 Council User Login"):
     if not st.session_state.user_auth:
         email_input = st.text_input("Enter your work email")
         if st.button("Login"):
@@ -71,39 +84,39 @@ with st.expander("👤 Council User Login"):
 
 # --- Upload Interface for Admins ---
 if st.session_state.is_admin:
-    st.markdown("### 📤 Upload Council PDFs")
-    uploaded_files = st.file_uploader("Upload PDFs", type=["pdf"], accept_multiple_files=True)
-    if uploaded_files:
-        save_dir = f"docs/{council_key}"
-        index_dir = f"index/{council_key}"
-        os.makedirs(save_dir, exist_ok=True)
+    with left:
+        st.markdown("### 📤 Upload Council PDFs")
+        uploaded_files = st.file_uploader("Upload PDFs", type=["pdf"], accept_multiple_files=True)
+        if uploaded_files:
+            save_dir = f"docs/{council_key}"
+            index_dir = f"index/{council_key}"
+            os.makedirs(save_dir, exist_ok=True)
 
-        # Clear old files and index for overwrite
-        for f in os.listdir(save_dir):
-            os.remove(os.path.join(save_dir, f))
-        if os.path.exists(index_dir):
-            shutil.rmtree(index_dir)
+            for f in os.listdir(save_dir):
+                os.remove(os.path.join(save_dir, f))
+            if os.path.exists(index_dir):
+                shutil.rmtree(index_dir)
 
-        for file in uploaded_files:
-            with open(os.path.join(save_dir, file.name), "wb") as f:
-                f.write(file.getbuffer())
+            for file in uploaded_files:
+                with open(os.path.join(save_dir, file.name), "wb") as f:
+                    f.write(file.getbuffer())
 
-        loader = PyPDFDirectoryLoader(save_dir)
-        docs = loader.load()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        split_docs = text_splitter.split_documents(docs)
-        embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
-        db = FAISS.from_documents(split_docs, embeddings)
-        db.save_local(index_dir)
+            loader = PyPDFDirectoryLoader(save_dir)
+            docs = loader.load()
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+            split_docs = text_splitter.split_documents(docs)
+            embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+            db = FAISS.from_documents(split_docs, embeddings)
+            db.save_local(index_dir)
 
-        st.success(f"✅ Uploaded and indexed {len(uploaded_files)} file(s) for {council}")
+            st.success(f"✅ Uploaded and indexed {len(uploaded_files)} file(s) for {council}")
 
-        st.markdown("### 🗂️ Uploaded Files")
-        for filename in os.listdir(save_dir):
-            st.write(filename)
-            if st.button(f"🗑 Delete {filename}", key=f"delete_{filename}"):
-                os.remove(os.path.join(save_dir, filename))
-                st.success(f"Deleted {filename}")
+            st.markdown("### 🗂️ Uploaded Files")
+            for filename in os.listdir(save_dir):
+                st.write(filename)
+                if st.button(f"🗑 Delete {filename}", key=f"delete_{filename}"):
+                    os.remove(os.path.join(save_dir, filename))
+                    st.success(f"Deleted {filename}")
 
 # --- Email Sending ---
 def send_auto_email(recipient, question, answer):
@@ -129,85 +142,77 @@ def send_auto_email(recipient, question, answer):
         st.error(f"Failed to send email: {e}")
         return False
 
-# --- Branding ---
-st.markdown(f"""
-    <div style='text-align:center'>
-      <h1>\U0001F3DB️ CivReply AI – {council}</h1>
-      <img src="{config.get('hero_image')}" width="200" />
-      <p><em>{config.get('tagline')}</em></p>
-    </div>
-""", unsafe_allow_html=True)
+# --- Title + Branding ---
+with center:
+    st.markdown(f"""
+        <div style='text-align:center'>
+          <h1>🏛 CivReply AI – {council}</h1>
+          <img src="{config.get('hero_image')}" width="200" />
+          <p><em>{config.get('tagline')}</em></p>
+        </div>
+    """, unsafe_allow_html=True)
 
-plan = config.get("plan", "basic")
-limits = {
-    "basic": {"queries": 500, "users": 1},
-    "standard": {"queries": 2000, "users": 5},
-    "enterprise": {"queries": float("inf"), "users": 20},
-}[plan]
+    plan = config.get("plan", "basic")
+    limits = {
+        "basic": {"queries": 500, "users": 1},
+        "standard": {"queries": 2000, "users": 5},
+        "enterprise": {"queries": float("inf"), "users": 20},
+    }[plan]
 
-st.markdown(f"""
-    <div style='background:#f1f5f9; padding:10px; border-left: 5px solid #3b82f6;'>
-    💼 Plan: <strong>{plan.capitalize()}</strong> | {limits['queries']} queries/mo | {limits['users']} seats
-    </div>
-""", unsafe_allow_html=True)
+    st.markdown(f"""
+        <div style='background:#f1f5f9; padding:10px; border-left: 5px solid #3b82f6;'>
+        💼 Plan: <strong>{plan.capitalize()}</strong> | {limits['queries']} queries/mo | {limits['users']} seats
+        </div>
+    """, unsafe_allow_html=True)
 
-st.info(config.get("about", "This council uses CivReply AI to assist residents with smarter answers."))
+    st.info(config.get("about", "This council uses CivReply AI to assist residents with smarter answers."))
 
-st.markdown("### 🔍 Ask a local question:")
-user_question = st.text_input("Your question", placeholder="e.g., What day is bin collection?")
-user_email = st.text_input("Your email (optional)", placeholder="your@email.com")
+    st.markdown("### 🔍 Ask a local question:")
+    user_question = st.text_input("Your question", placeholder="e.g., What day is bin collection?")
+    user_email = st.text_input("Your email (optional)", placeholder="your@email.com")
 
-if user_question:
-    if st.session_state.query_count[council_key] < limits["queries"]:
-        st.session_state.query_count[council_key] += 1
-        llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY)
-        index_path = f"index/{council_key}/index.faiss"
-        retriever = FAISS.load_local(index_path, OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)).as_retriever()
-        qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
-        answer = qa_chain.run(user_question)
-        st.markdown(f"**Answer:** {answer}")
+    if user_question:
+        if st.session_state.query_count[council_key] < limits["queries"]:
+            st.session_state.query_count[council_key] += 1
+            llm = ChatOpenAI(openai_api_key=OPENAI_API_KEY)
+            index_path = f"index/{council_key}/index.faiss"
+            retriever = FAISS.load_local(index_path, OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)).as_retriever()
+            qa_chain = RetrievalQA.from_chain_type(llm=llm, retriever=retriever)
+            answer = qa_chain.run(user_question)
+            st.markdown(f"**Answer:** {answer}")
 
-        if user_email:
-            if send_auto_email(user_email, user_question, answer):
-                st.success("✅ Answer sent to your email.")
+            st.session_state.history[council_key].append({"question": user_question, "answer": answer})
 
-        st.markdown("### 🙋 Feedback")
-        feedback = st.radio("Was this helpful?", ["👍", "👎"], key=f"fb_{st.session_state.query_count[council_key]}")
-        comment = st.text_input("Any notes?", key=f"note_{st.session_state.query_count[council_key]}")
-        if st.button("Submit Feedback"):
-            st.session_state.feedback[council_key].append({
-                "question": user_question,
-                "answer": answer,
-                "feedback": feedback,
-                "comment": comment,
-                "time": datetime.now().isoformat()
-            })
-            st.success("🙏 Thanks for your feedback!")
-    else:
-        st.error("You’ve reached the max query limit for this council’s plan.")
+            if user_email:
+                if send_auto_email(user_email, user_question, answer):
+                    st.success("✅ Answer sent to your email.")
 
-if st.session_state.is_admin:
-    st.markdown("## 📊 Admin Dashboard")
-    st.write("**Total queries:**", st.session_state.query_count[council_key])
-    st.write("**Emails sent:**", len(st.session_state.email_log[council_key]))
-    st.write("**Feedback count:**", len(st.session_state.feedback[council_key]))
+            st.markdown("### 🙋 Feedback")
+            feedback = st.radio("Was this helpful?", ["⭐️⭐️⭐️⭐️⭐️", "⭐️⭐️⭐️⭐️", "⭐️⭐️⭐️", "⭐️⭐️", "⭐️"], key=f"fb_{st.session_state.query_count[council_key]}")
+            comment = st.text_input("Any notes?", key=f"note_{st.session_state.query_count[council_key]}")
+            if st.button("Submit Feedback"):
+                st.session_state.feedback[council_key].append({
+                    "question": user_question,
+                    "answer": answer,
+                    "feedback": feedback,
+                    "comment": comment,
+                    "time": datetime.now().isoformat()
+                })
+                st.success("🙏 Thanks for your feedback!")
+        else:
+            st.error("You’ve reached the max query limit for this council’s plan.")
 
-    st.markdown("### 👥 Team Management")
-    new_user = st.text_input("Invite user (email ending with @gov.au)")
-    if st.button("Add user"):
-        if new_user.endswith("@gov.au") and new_user not in st.session_state.users[council_key]:
-            st.session_state.users[council_key].append(new_user)
-            st.success(f"✅ Added {new_user} to the council users list.")
-    if st.session_state.users[council_key]:
-        for u in st.session_state.users[council_key]:
-            if st.button(f"Remove {u}", key=f"rm_{u}"):
-                st.session_state.users[council_key].remove(u)
-                st.success(f"Removed {u}")
+# --- Sidebar History ---
+with right:
+    st.markdown("### 🕘 Past Conversations")
+    for item in reversed(st.session_state.history[council_key][-10:]):
+        st.markdown(f"- **Q:** {item['question']}\n\n  **A:** {item['answer']}")
 
-    st.markdown("### 📬 Email Log")
-    for log in st.session_state.email_log[council_key]:
-        st.markdown(f"- [{log['time']}] Sent to {log['to']} | Q: _{log['question']}_")
+    if st.session_state.get("is_admin"):
+        st.markdown("### 📬 Email Log")
+        for log in st.session_state.email_log[council_key]:
+            st.markdown(f"- [{log['time']}] Sent to {log['to']} | Q: _{log['question']}_")
 
-    st.markdown("### 📣 Feedback Log")
-    for item in st.session_state.feedback[council_key]:
-        st.markdown(f"- [{item['time']}] {item['feedback']} | Q: _{item['question']}_ | {item['comment']}")
+        st.markdown("### 📣 Feedback Log")
+        for item in st.session_state.feedback[council_key]:
+            st.markdown(f"- [{item['time']}] {item['feedback']} | Q: _{item['question']}_ | {item['comment']}")
