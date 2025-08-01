@@ -65,6 +65,7 @@ plan_queries = plan_limits[st.session_state.plan]["queries"]
 plan_users = plan_limits[st.session_state.plan]["users"]
 
 # --- Council Custom Content ---
+# --- Council Custom Content ---
 council_landing_config = {
     "wyndham": {
         "tagline": "Empowering Wyndham residents with smarter answers.",
@@ -117,7 +118,7 @@ council_landing_config = {
         "about": "Find what you need about permits, parking, and arts programs across Port Phillip."
     }
 }
-}
+
 
 config = council_landing_config.get(council_key, {})
 tagline = config.get("tagline", f"Ask {council} Council anything – policies, laws, documents.")
