@@ -7,7 +7,10 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 
-# === APP CONFIG ===
+# === THEME ===
+WYNDHAM_BLUE = "#36A9E1"
+WYNDHAM_LIGHT = "#e3f3fa"
+
 st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="wide")
 
 PLAN_CONFIG = {
@@ -71,75 +74,114 @@ st.session_state.setdefault("language", "English")
 st.session_state.setdefault("council", "Wyndham")
 st.session_state.setdefault("session_start", datetime.now().isoformat())
 
-# === HEADER ===
+# === TOP HEADER (COLORED + LOGO) ===
 st.markdown(
-    """
-    <div style='display: flex; align-items: center; justify-content: center; margin-top: 10px; margin-bottom: 8px; gap: 18px;'>
-        <img src="https://www.wyndham.vic.gov.au/sites/default/files/styles/small/public/2020-06/logo_0.png" width="44" style="border-radius:8px;" />
-        <h1 style='margin-bottom: 0; margin-top: 0; font-size: 2.5rem;'>CivReply AI</h1>
+    f"""
+    <div style='background:{WYNDHAM_BLUE};padding:24px 0 16px 0;border-radius:0 0 30px 30px;box-shadow:0 4px 18px #cce5f7;'>
+      <div style='display:flex;align-items:center;justify-content:center;gap:18px;'>
+        <img src="https://www.wyndham.vic.gov.au/sites/default/files/styles/small/public/2020-06/logo_0.png" width="60" style="border-radius:10px;box-shadow:0 0 8px #83caec;">
+        <span style='font-size:2.8rem;font-weight:800;color:#fff;letter-spacing:1px;'>CivReply AI</span>
+      </div>
     </div>
     """, unsafe_allow_html=True
 )
 
-# === PLAN BADGE & CONTROLS ===
-ctrl_cols = st.columns([1,1,1], gap="large")
-with ctrl_cols[0]:
-    st.markdown("🌐 <b>Language</b>", unsafe_allow_html=True)
-    st.session_state.language = st.selectbox(
-        "",
-        options=["English", "Arabic", "Chinese", "Hindi", "Spanish"],
-        index=["English", "Arabic", "Chinese", "Hindi", "Spanish"].index(st.session_state.language)
-        if st.session_state.get("language") in ["English", "Arabic", "Chinese", "Hindi", "Spanish"]
-        else 0,
-        label_visibility="collapsed"
+# === PLAN BADGE & CONTROLS BAR (COLORED) ===
+st.markdown(
+    f"""
+    <div style='background:{WYNDHAM_LIGHT};border-radius:16px;padding:16px 32px;display:flex;justify-content:center;align-items:center;gap:50px;margin-top:20px;margin-bottom:12px;'>
+        <div>
+            <span style='color:#2078b2;font-size:1.1rem;font-weight:700'>Active Council:</span>
+            <span style='font-weight:700;'>{st.session_state.council}</span>
+        </div>
+        <div>
+            <span style='color:#2078b2;font-size:1.1rem;font-weight:700'>Plan:</span>
+            <span style='font-weight:700;'>{PLAN_CONFIG[st.session_state.plan]['label']}</span>
+        </div>
+        <div>
+            <span style='color:#2078b2;font-size:1.1rem;font-weight:700'>Language:</span>
+        </div>
+        <div style="margin-top:-10px;">
+            """,
+    unsafe_allow_html=True
+)
+st.session_state.language = st.selectbox(
+    "",
+    options=["English", "Arabic", "Chinese", "Hindi", "Spanish"],
+    index=["English", "Arabic", "Chinese", "Hindi", "Spanish"].index(st.session_state.language)
+    if st.session_state.get("language") in ["English", "Arabic", "Chinese", "Hindi", "Spanish"]
+    else 0,
+    label_visibility="collapsed"
+)
+st.markdown("</div>", unsafe_allow_html=True)
+
+# === CONTROLS BAR END ===
+# Role Selector
+col1, col2, col3 = st.columns([1,2,1])
+with col2:
+    st.markdown(
+        "<div style='margin-top:12px;margin-bottom:0;font-size:1.08rem;font-weight:700;color:#2078b2;'>Select Role</div>",
+        unsafe_allow_html=True,
     )
-with ctrl_cols[1]:
-    st.markdown("👤 <b>Select Role</b>", unsafe_allow_html=True)
     st.session_state.user_role = st.selectbox(
         "",
         options=["Resident", "Staff", "Visitor"],
         index=["Resident", "Staff", "Visitor"].index(st.session_state.get("user_role", "Resident")),
         label_visibility="collapsed"
     )
-with ctrl_cols[2]:
+    # Only Staff can change plan live (admin control)
     if st.session_state.user_role == "Staff":
-        st.markdown("🛠️ <b>Admin Plan Control</b>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top:10px;font-weight:600;'>🛠️ Admin Plan Control</div>", unsafe_allow_html=True)
         st.session_state.plan = st.selectbox(
             "",
             options=["basic", "standard", "enterprise"],
             format_func=lambda x: PLAN_CONFIG[x]["label"],
-            key="admin_plan_selector"
+            key="admin_plan_selector",
+            label_visibility="collapsed"
         )
-
-st.markdown(
-    f"<div style='display:flex;justify-content:center;margin-bottom:10px;'><span style='background:#e3f0ff;color:#0a318e;padding:7px 28px;border-radius:16px;font-weight:bold;'>{PLAN_CONFIG[st.session_state.plan]['label']}</span></div>",
-    unsafe_allow_html=True
-)
-st.divider()
+st.markdown("<hr style='margin-top:28px;margin-bottom:4px;border:1.2px solid #d8eafe;border-radius:6px;'>", unsafe_allow_html=True)
 
 # === SIDEBAR ===
 with st.sidebar:
-    st.title("CivReply AI")
+    st.markdown(
+        f"""
+        <div style='background:{WYNDHAM_BLUE};padding:24px 0 16px 0;border-radius:0 0 30px 30px;box-shadow:0 4px 18px #cce5f7;margin-bottom:18px;'>
+          <div style='display:flex;align-items:center;justify-content:center;gap:10px;'>
+            <img src="https://www.wyndham.vic.gov.au/sites/default/files/styles/small/public/2020-06/logo_0.png" width="40" style="border-radius:7px;box-shadow:0 0 8px #83caec;">
+            <span style='font-size:1.5rem;font-weight:700;color:#fff;letter-spacing:0.5px;'>CivReply AI</span>
+          </div>
+        </div>
+        """, unsafe_allow_html=True
+    )
     nav = st.radio(
-        "📚 Menu",
+        "Menu",
         [
             "💬 Chat with Council AI",
             "📥 Submit a Request",
-            "⬆️ Upgrades",
             "📊 Stats & Session",
             "💡 Share Feedback",
             "📞 Contact Us",
             "⚙️ Admin Panel"
         ],
+        label_visibility="collapsed"
     )
-    st.markdown("---")
     st.markdown("#### Recent Chats")
     last_5 = [q for q, a in st.session_state.chat_history[-5:]]
     if last_5:
         for q in reversed(last_5):
-            st.markdown(f"<div style='padding:7px 0; font-size:16px;'>{q}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='padding:8px 0; font-size:15px;color:#235b7d;'>{q}</div>", unsafe_allow_html=True)
     else:
-        st.markdown("<span style='color:#aaa;'>No chats yet</span>", unsafe_allow_html=True)
+        st.markdown("<span style='color:#7eb7d8;'>No chats yet</span>", unsafe_allow_html=True)
+    # UPGRADES CARD (below chats)
+    st.markdown(
+        f"""
+        <div style='background:{WYNDHAM_LIGHT};border-radius:18px;padding:18px 20px;margin-top:22px;margin-bottom:6px;box-shadow:0 2px 12px #b4dbf2;'>
+            <div style='font-size:1.22rem;font-weight:700;color:#158ed8;margin-bottom:7px;'>🚀 Upgrade Your Plan</div>
+            <div style='margin-bottom:10px;line-height:1.5;color:#2e5871;'>Unlock more features, higher limits, integrations, automations, and dedicated support with Standard or Enterprise plans.</div>
+            <a href='#Upgrades' style='background:{WYNDHAM_BLUE};color:#fff;font-weight:600;padding:7px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-size:1rem;margin-top:6px;'>View Plans</a>
+        </div>
+        """, unsafe_allow_html=True
+    )
 
 # === PLAN-SPECIFIC AI LOGIC ===
 def ask_ai(question, council):
@@ -201,26 +243,6 @@ elif nav == "📥 Submit a Request":
     st.markdown("📌 Redirecting to your council’s website.")
     st.link_button("📝 Submit Online", "https://www.wyndham.vic.gov.au/request-it")
 
-elif nav == "⬆️ Upgrades":
-    st.title("Upgrade your plan")
-    st.subheader("Compare business tiers")
-    cols = st.columns(3)
-    with cols[0]:
-        st.markdown("#### Basic")
-        st.markdown("**$499 AUD/mo**")
-        for feat in PLAN_CONFIG["basic"]["features"]:
-            st.markdown(f"- {feat}")
-    with cols[1]:
-        st.markdown("#### Standard")
-        st.markdown("**$1,499 AUD/mo**")
-        for feat in PLAN_CONFIG["standard"]["features"]:
-            st.markdown(f"- {feat}")
-    with cols[2]:
-        st.markdown("#### Enterprise")
-        st.markdown("**$2,999+ AUD/mo**")
-        for feat in PLAN_CONFIG["enterprise"]["features"]:
-            st.markdown(f"- {feat}")
-
 elif nav == "📊 Stats & Session":
     st.metric("Total Questions", st.session_state.query_count)
     st.metric("Session Start", st.session_state.session_start)
@@ -263,3 +285,32 @@ elif nav == "⚙️ Admin Panel":
                 st.success("✅ Index rebuilt successfully.")
             else:
                 st.warning("Please upload at least one document.")
+
+# --- Upgrades Section (hidden anchor for sidebar button) ---
+st.markdown("<a name='Upgrades'></a>", unsafe_allow_html=True)
+if st.session_state.get("plan") in ["basic", "standard", "enterprise"]:
+    st.markdown(
+        f"""
+        <div style='margin-top:38px;'>
+            <h2 style="color:{WYNDHAM_BLUE};font-size:2rem;margin-bottom:14px;">Compare business tiers</h2>
+            <div style="display: flex; gap: 22px; margin-bottom:24px;">
+        """, unsafe_allow_html=True
+    )
+    cols = st.columns(3)
+    for i, (plan_key, plan) in enumerate(PLAN_CONFIG.items()):
+        with cols[i]:
+            st.markdown(
+                f"""
+                <div style='background:#fff;border-radius:20px;box-shadow:0 6px 30px #c1e3f4;padding:30px 20px 20px 20px;margin-bottom:18px;min-height:380px;'>
+                  <div style="font-size:1.3rem;font-weight:700;color:#2078b2;margin-bottom:8px;">{plan['label'].split('(')[0]}</div>
+                  <div style="font-size:2.1rem;font-weight:900;color:{WYNDHAM_BLUE};margin-bottom:5px;">{plan['label'].split('(')[1][:-4]}</div>
+                  <div style='color:#555;margin-bottom:20px;'>{' / month'}</div>
+                  <div style="margin-bottom:8px;">
+                    <ul style="padding-left:18px;font-size:1.09rem;line-height:1.7;">
+                      {''.join([f"<li style='margin-bottom:3px;color:#1374ab'>{f}</li>" for f in plan['features']])}
+                    </ul>
+                  </div>
+                </div>
+                """, unsafe_allow_html=True
+            )
+    st.markdown("</div>", unsafe_allow_html=True)
