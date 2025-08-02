@@ -1,10 +1,3 @@
-Absolutely! Here’s your **full `app.py`**, including all the fixes, color, icons, English-only, admin password (`llama`), sales mail link for upgrades, About Us section, and the plan comparison cards at the bottom.
-This is ready to run and should resolve **all triple-quote and indentation errors**.
-**Just copy and replace your current file with this.**
-
----
-
-```python
 import streamlit as st
 import os
 from datetime import datetime
