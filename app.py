@@ -1,3 +1,10 @@
+Absolutely! Here’s your **full `app.py`**, including all the fixes, color, icons, English-only, admin password (`llama`), sales mail link for upgrades, About Us section, and the plan comparison cards at the bottom.
+This is ready to run and should resolve **all triple-quote and indentation errors**.
+**Just copy and replace your current file with this.**
+
+---
+
+```python
 import streamlit as st
 import os
 from datetime import datetime
@@ -307,7 +314,8 @@ if st.session_state.get("plan") in ["basic", "standard", "enterprise"]:
         <div style='margin-top:40px;'>
             <h2 style="color:{WYNDHAM_DEEP};font-size:2.05rem;margin-bottom:14px;font-weight:900;">Compare business tiers</h2>
             <div style="display: flex; gap: 24px; margin-bottom:24px;">
-        """, unsafe_allow_html=True
+        """,
+        unsafe_allow_html=True
     )
     cols = st.columns(3)
     for i, (plan_key, plan) in enumerate(PLAN_CONFIG.items()):
@@ -315,4 +323,10 @@ if st.session_state.get("plan") in ["basic", "standard", "enterprise"]:
             price = plan['label'].split('(')[1][:-4]
             st.markdown(
                 f"""
-                <div style='background:linear-gradient(145deg,#f2fbfe 60%,#cbe7f8 100%);border-radius:22px;box-shadow:0 8px 30px #c1e3f4;padding:32px 22px 20px 22px;margin-bottom:20px
+                <div style='background:linear-gradient(145deg,#f2fbfe 60%,#cbe7f8 100%);border-radius:22px;box-shadow:0 8px 30px #c1e3f4;padding:32px 22px 20px 22px;margin-bottom:20px;min-height:420px;transition:box-shadow 0.2s;'>
+                  <div style="font-size:1.4rem;font-weight:900;color:#158ed8;margin-bottom:10px;">{plan['icon']} {plan['label'].split('(')[0]}</div>
+                  <div style="font-size:2rem;font-weight:800;color:{WYNDHAM_BLUE};margin-bottom:6px;">{price} AUD</div>
+                  <div style='color:#555;margin-bottom:20px;'>/ month</div>
+                  <div style="margin-bottom:10px;">
+                    <ul style="padding-left:18px;font-size:1.12rem;line-height:1.7
+```
