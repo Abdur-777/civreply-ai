@@ -7,6 +7,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 
+# ===== THEME AND CONFIG =====
 WYNDHAM_BLUE = "#36A9E1"
 WYNDHAM_DEEP = "#2078b2"
 WYNDHAM_LIGHT = "#e3f3fa"
@@ -80,7 +81,7 @@ st.session_state.setdefault("council", "Wyndham")
 st.session_state.setdefault("session_start", datetime.now().isoformat())
 st.session_state.setdefault("admin_verified", False)
 
-# --- THEMED HEADER with LOGO & GRADIENT ---
+# ===== HEADER BAR =====
 st.markdown(
     f"""
     <div style='background:linear-gradient(90deg,{WYNDHAM_BLUE},#7ecaf6 90%);padding:28px 0 16px 0;border-radius:0 0 34px 34px;box-shadow:0 6px 24px #cce5f7;'>
@@ -92,7 +93,7 @@ st.markdown(
     """, unsafe_allow_html=True
 )
 
-# PLAN + STATUS BADGE
+# ===== STATUS BAR =====
 st.markdown(
     f"""
     <div style='background:{WYNDHAM_LIGHT};border-radius:16px;padding:15px 40px;display:flex;justify-content:center;align-items:center;gap:60px;margin-top:18px;margin-bottom:12px;box-shadow:0 2px 10px #b4dbf2;'>
@@ -106,7 +107,7 @@ st.markdown(
     """, unsafe_allow_html=True
 )
 
-# ROLE SELECTOR CENTERED WITH CUSTOM ICON
+# ===== ROLE SELECTOR =====
 col1, col2, col3 = st.columns([1,2,1])
 with col2:
     st.markdown("<div style='margin-top:15px;font-size:1.13rem;font-weight:700;color:#2078b2;text-align:center;'>👤 Select Role</div>", unsafe_allow_html=True)
@@ -121,7 +122,7 @@ with col2:
         pw = st.text_input("Enter Staff Password", type="password", key="pwcheck")
         if pw and pw == ADMIN_PASSWORD:
             st.session_state.admin_verified = True
-            st.success("Staff access granted! 🎉")
+            st.success("Staff access granted!")
             st.balloons()
         elif pw and pw != ADMIN_PASSWORD:
             st.error("Incorrect password. Please try again.")
@@ -140,7 +141,7 @@ with col2:
 
 st.markdown("<hr style='margin-top:26px;margin-bottom:5px;border:1.2px solid #d8eafe;border-radius:7px;'>", unsafe_allow_html=True)
 
-# === SIDEBAR (with custom emoji icons) ===
+# ===== SIDEBAR =====
 with st.sidebar:
     st.markdown(
         f"""
@@ -182,7 +183,7 @@ with st.sidebar:
         """, unsafe_allow_html=True
     )
 
-# === PLAN-SPECIFIC AI LOGIC (enforcing English answers) ===
+# ====== PLAN-SPECIFIC AI LOGIC ======
 def ask_ai(question, council):
     plan = st.session_state.get("plan", "basic")
     embeddings = OpenAIEmbeddings()
@@ -191,7 +192,6 @@ def ask_ai(question, council):
         return "[Error] No index found for this council"
     db = FAISS.load_local(index_path, embeddings)
     retriever = db.as_retriever()
-    # Always answer in English, even if the input is in another language.
     if plan == "basic":
         llm = ChatOpenAI(api_key=OPENAI_KEY, model="gpt-3.5-turbo")
         prompt = "You are a helpful council assistant. Only answer from the provided documents. Always respond in English."
@@ -223,7 +223,7 @@ if st.session_state.query_count >= plan_limit:
     st.warning(f"❗ You’ve reached the {PLAN_CONFIG[plan_id]['label']} limit.")
     st.stop()
 
-# === MAIN ROUTER ===
+# ===== MAIN APP ROUTER =====
 if nav == "💬 Chat with Council AI":
     st.subheader("💬 Ask Wyndham Council")
     user_input = st.chat_input("Ask a question about Wyndham policies, forms, or documents…")
@@ -253,7 +253,7 @@ elif nav == "💡 Share Feedback":
     email = st.text_input("Email (optional)")
     if st.button("📨 Submit"):
         log_feedback(fb, email)
-        st.success("Thanks for helping improve CivReply AI! 🎉")
+        st.success("Thanks for helping improve CivReply AI!")
 
 elif nav == "📞 Contact Us":
     st.markdown("**Call:** (03) 9742 0777")
@@ -299,7 +299,7 @@ elif nav == "⚙️ Admin Panel":
             else:
                 st.warning("Please upload at least one document.")
 
-# --- Upgrades Section (hidden anchor for sidebar button) ---
+# ===== UPGRADES SECTION (hidden anchor for sidebar button) =====
 st.markdown("<a name='Upgrades'></a>", unsafe_allow_html=True)
 if st.session_state.get("plan") in ["basic", "standard", "enterprise"]:
     st.markdown(
@@ -322,13 +322,12 @@ if st.session_state.get("plan") in ["basic", "standard", "enterprise"]:
                   <div style='color:#555;margin-bottom:20px;'>/ month</div>
                   <div style="margin-bottom:10px;">
                     <ul style="padding-left:18px;font-size:1.12rem;line-height:1.7;">
-                      {''.join([f"<li style='margin-bottom:4px;color:#1374ab'>{f}</li>" for f in plan['features']])
-```
-
-
-} </ul> </div>
-{('<div style="margin-top:18px;"><a href="mailto:sales@civreply.com?subject=CivReply%20Plan%20Upgrade%20Enquiry" style="background:#36A9E1;color:#fff;font-weight:700;padding:10px 28px;border-radius:12px;text-decoration:none;display:inline-block;font-size:1.13rem;box-shadow:0 2px 6px #bae3fc;">Contact Sales</a></div>' if plan\_key in \['standard', 'enterprise'] else '')} </div>
-""",
-unsafe\_allow\_html=True
-)
-st.markdown("</div></div>", unsafe\_allow\_html=True)
+                      {''.join([f"<li style='margin-bottom:4px;color:#1374ab'>{f}</li>" for f in plan['features']])}
+                    </ul>
+                  </div>
+                  {'<div style="margin-top:18px;"><a href="mailto:sales@civreply.com?subject=CivReply%20Plan%20Upgrade%20Enquiry" style="background:#36A9E1;color:#fff;font-weight:700;padding:10px 28px;border-radius:12px;text-decoration:none;display:inline-block;font-size:1.13rem;box-shadow:0 2px 6px #bae3fc;">Contact Sales</a></div>' if plan_key in ['standard', 'enterprise'] else ''}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    st.markdown("</div></div>", unsafe_allow_html=True)
