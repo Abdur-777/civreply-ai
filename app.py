@@ -12,8 +12,7 @@ WYNDHAM_BLUE = "#36A9E1"
 WYNDHAM_DEEP = "#2078b2"
 WYNDHAM_LIGHT = "#e3f3fa"
 ADMIN_PASSWORD = "llama"
-
-LOGO_PATH = "b7b9830f-9785-40ad-acd0-4a3bb9ccedde.png"  # Path to your uploaded logo file
+LOGO_PATH = "b7b9830f-9785-40ad-acd0-4a3bb9ccedde.png"  # Your uploaded logo
 
 st.set_page_config(page_title="CivReply AI", page_icon=LOGO_PATH, layout="wide")
 
@@ -83,18 +82,18 @@ st.session_state.setdefault("council", "Wyndham")
 st.session_state.setdefault("session_start", datetime.now().isoformat())
 st.session_state.setdefault("admin_verified", False)
 
-# ===== HEADER BAR WITH LOGO FILE =====
+# ===== HEADER BAR WITH LOGO =====
 st.markdown(
     f"""
-    <div style='background:linear-gradient(90deg,{WYNDHAM_BLUE},#7ecaf6 90%);padding:28px 0 16px 0;border-radius:0 0 34px 34px;box-shadow:0 6px 24px #cce5f7;'>
-      <div style='display:flex;align-items:center;justify-content:center;gap:18px;'>
+    <div style='background:linear-gradient(90deg,{WYNDHAM_BLUE},#7ecaf6 90%);padding:18px 0 12px 0;border-radius:0 0 32px 32px;box-shadow:0 4px 24px #cce5f7;margin-bottom:0;'>
+      <div style='display:flex;align-items:center;justify-content:center;gap:20px;'>
     """,
     unsafe_allow_html=True
 )
-st.image(LOGO_PATH, width=60)
+st.image(LOGO_PATH, width=58)
 st.markdown(
     """
-        <span style='font-size:2.8rem;font-weight:900;color:#fff;letter-spacing:2px;text-shadow:0 2px 10px #36A9E155;margin-left:14px;'>CivReply AI</span>
+        <span style='font-size:2.6rem;font-weight:900;color:#fff;letter-spacing:2px;text-shadow:0 2px 10px #36A9E155;margin-left:12px;'>CivReply AI</span>
       </div>
     </div>
     """,
@@ -104,7 +103,7 @@ st.markdown(
 # ===== STATUS BAR =====
 st.markdown(
     f"""
-    <div style='background:{WYNDHAM_LIGHT};border-radius:16px;padding:15px 40px;display:flex;justify-content:center;align-items:center;gap:60px;margin-top:18px;margin-bottom:12px;box-shadow:0 2px 10px #b4dbf2;'>
+    <div style='background:{WYNDHAM_LIGHT};border-radius:16px;padding:14px 38px;display:flex;justify-content:center;align-items:center;gap:55px;margin-top:12px;margin-bottom:10px;box-shadow:0 2px 8px #b4dbf2;'>
         <div style='color:{WYNDHAM_DEEP};font-size:1.12rem;font-weight:700'>🏛️ Active Council:</div>
         <div style='font-weight:700;'>{st.session_state.council}</div>
         <div style='color:{WYNDHAM_DEEP};font-size:1.12rem;font-weight:700'>📦 Plan:</div>
@@ -147,21 +146,21 @@ with col2:
     elif user_role != "Staff":
         st.session_state.admin_verified = False
 
-st.markdown("<hr style='margin-top:26px;margin-bottom:5px;border:1.2px solid #d8eafe;border-radius:7px;'>", unsafe_allow_html=True)
+st.markdown("<hr style='margin-top:18px;margin-bottom:5px;border:1.2px solid #d8eafe;border-radius:7px;'>", unsafe_allow_html=True)
 
-# ===== SIDEBAR WITH REAL LOGO FILE (NO UPGRADE CARD) =====
+# ===== SIDEBAR WITH LOGO (NO UPGRADE CARD) =====
 with st.sidebar:
     st.markdown(
         f"""
-        <div style='background:{WYNDHAM_BLUE};padding:22px 0 12px 0;border-radius:0 0 32px 32px;box-shadow:0 4px 18px #cce5f7;margin-bottom:14px;'>
-          <div style='display:flex;align-items:center;justify-content:center;gap:10px;'>
+        <div style='background:{WYNDHAM_BLUE};padding:16px 0 8px 0;border-radius:0 0 32px 32px;box-shadow:0 4px 18px #cce5f7;margin-bottom:12px;'>
+          <div style='display:flex;align-items:center;justify-content:center;gap:8px;'>
         """,
         unsafe_allow_html=True
     )
-    st.image(LOGO_PATH, width=48)
+    st.image(LOGO_PATH, width=44)
     st.markdown(
         """
-            <span style='font-size:1.45rem;font-weight:800;color:#fff;letter-spacing:0.5px;'>CivReply AI</span>
+            <span style='font-size:1.32rem;font-weight:800;color:#fff;letter-spacing:0.5px;'>CivReply AI</span>
           </div>
         </div>
         """,
@@ -180,11 +179,11 @@ with st.sidebar:
         ],
         label_visibility="collapsed"
     )
-    st.markdown("<div style='text-align:center;font-size:1.12rem;font-weight:700;color:#235b7d;margin:16px 0 0 0;'>Recent Chats</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center;font-size:1.12rem;font-weight:700;color:#235b7d;margin:13px 0 0 0;'>Recent Chats</div>", unsafe_allow_html=True)
     last_5 = [q for q, a in st.session_state.chat_history[-5:]]
     if last_5:
         for q in reversed(last_5):
-            st.markdown(f"<div style='padding:10px 0; text-align:center; font-size:15.5px;color:#2078b2;'>{q}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='padding:8px 0; text-align:center; font-size:15.5px;color:#2078b2;'>{q}</div>", unsafe_allow_html=True)
     else:
         st.markdown("<span style='color:#7eb7d8;text-align:center;display:block;'>No chats yet</span>", unsafe_allow_html=True)
 
@@ -301,13 +300,13 @@ elif nav == "⚙️ Admin Panel":
             else:
                 st.warning("Please upload at least one document.")
 
-# ===== UPGRADE PLAN SECTION ON MAIN PAGE (NOT IN SIDEBAR) =====
+# ===== UPGRADE PLAN SECTION ON MAIN PAGE ONLY =====
 st.markdown("<a name='Upgrades'></a>", unsafe_allow_html=True)
 if st.session_state.get("plan") in ["basic", "standard", "enterprise"]:
     st.markdown(
         f"""
-        <div style='margin-top:40px;'>
-            <h2 style="color:{WYNDHAM_DEEP};font-size:2.05rem;margin-bottom:14px;font-weight:900;">Compare business tiers</h2>
+        <div style='margin-top:36px;'>
+            <h2 style="color:{WYNDHAM_DEEP};font-size:2.0rem;margin-bottom:13px;font-weight:900;">Compare business tiers</h2>
             <div style="display: flex; gap: 24px; margin-bottom:24px;">
         """,
         unsafe_allow_html=True
@@ -318,16 +317,16 @@ if st.session_state.get("plan") in ["basic", "standard", "enterprise"]:
             price = plan['label'].split('(')[1][:-4]
             st.markdown(
                 f"""
-                <div style='background:linear-gradient(145deg,#f2fbfe 60%,#cbe7f8 100%);border-radius:22px;box-shadow:0 8px 30px #c1e3f4;padding:32px 22px 20px 22px;margin-bottom:20px;min-height:420px;transition:box-shadow 0.2s;'>
-                  <div style="font-size:1.4rem;font-weight:900;color:#158ed8;margin-bottom:10px;">{plan['icon']} {plan['label'].split('(')[0]}</div>
-                  <div style="font-size:2rem;font-weight:800;color:{WYNDHAM_BLUE};margin-bottom:6px;">{price} AUD</div>
-                  <div style='color:#555;margin-bottom:20px;'>/ month</div>
-                  <div style="margin-bottom:10px;">
-                    <ul style="padding-left:18px;font-size:1.12rem;line-height:1.7;">
+                <div style='background:linear-gradient(145deg,#f2fbfe 60%,#cbe7f8 100%);border-radius:22px;box-shadow:0 8px 30px #c1e3f4;padding:28px 20px 18px 20px;margin-bottom:18px;min-height:390px;transition:box-shadow 0.2s;'>
+                  <div style="font-size:1.34rem;font-weight:900;color:#158ed8;margin-bottom:10px;">{plan['icon']} {plan['label'].split('(')[0]}</div>
+                  <div style="font-size:1.7rem;font-weight:800;color:{WYNDHAM_BLUE};margin-bottom:5px;">{price} AUD</div>
+                  <div style='color:#555;margin-bottom:17px;'>/ month</div>
+                  <div style="margin-bottom:9px;">
+                    <ul style="padding-left:16px;font-size:1.08rem;line-height:1.7;">
                       {''.join([f"<li style='margin-bottom:4px;color:#1374ab'>{f}</li>" for f in plan['features']])}
                     </ul>
                   </div>
-                  {'<div style="margin-top:18px;"><a href="mailto:sales@civreply.com?subject=CivReply%20Plan%20Upgrade%20Enquiry" style="background:#36A9E1;color:#fff;font-weight:700;padding:10px 28px;border-radius:12px;text-decoration:none;display:inline-block;font-size:1.13rem;box-shadow:0 2px 6px #bae3fc;">Contact Sales</a></div>' if plan_key in ['standard', 'enterprise'] else ''}
+                  {'<div style="margin-top:12px;"><a href="mailto:sales@civreply.com?subject=CivReply%20Plan%20Upgrade%20Enquiry" style="background:#36A9E1;color:#fff;font-weight:700;padding:8px 20px;border-radius:12px;text-decoration:none;display:inline-block;font-size:1.05rem;box-shadow:0 2px 6px #bae3fc;">Contact Sales</a></div>' if plan_key in ['standard', 'enterprise'] else ''}
                 </div>
                 """,
                 unsafe_allow_html=True
