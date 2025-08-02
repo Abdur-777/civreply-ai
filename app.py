@@ -309,7 +309,7 @@ if st.session_state.get("plan") in ["basic", "standard", "enterprise"]:
             <div style="display: flex; gap: 24px; margin-bottom:24px;">
         """, unsafe_allow_html=True
     )
-    cols = st.columns(3)
+        cols = st.columns(3)
     for i, (plan_key, plan) in enumerate(PLAN_CONFIG.items()):
         with cols[i]:
             price = plan['label'].split('(')[1][:-4]
@@ -317,4 +317,16 @@ if st.session_state.get("plan") in ["basic", "standard", "enterprise"]:
                 f"""
                 <div style='background:linear-gradient(145deg,#f2fbfe 60%,#cbe7f8 100%);border-radius:22px;box-shadow:0 8px 30px #c1e3f4;padding:32px 22px 20px 22px;margin-bottom:20px;min-height:420px;transition:box-shadow 0.2s;'>
                   <div style="font-size:1.4rem;font-weight:900;color:#158ed8;margin-bottom:10px;">{plan['icon']} {plan['label'].split('(')[0]}</div>
-                  <div style="font-size:2rem;font-weight:800;color:{WYNDHAM_BLUE};margin-bottom:6px;">
+                  <div style="font-size:2rem;font-weight:800;color:{WYNDHAM_BLUE};margin-bottom:6px;">{price} AUD</div>
+                  <div style='color:#555;margin-bottom:20px;'>/ month</div>
+                  <div style="margin-bottom:10px;">
+                    <ul style="padding-left:18px;font-size:1.12rem;line-height:1.7;">
+                      {''.join([f"<li style='margin-bottom:4px;color:#1374ab'>{f}</li>" for f in plan['features']])}
+                    </ul>
+                  </div>
+                  {'<div style="margin-top:18px;"><a href="mailto:sales@civreply.com?subject=CivReply%20Plan%20Upgrade%20Enquiry" style="background:#36A9E1;color:#fff;font-weight:700;padding:10px 28px;border-radius:12px;text-decoration:none;display:inline-block;font-size:1.13rem;box-shadow:0 2px 6px #bae3fc;">Contact Sales</a></div>' if plan_key in ['standard', 'enterprise'] else ''}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    st.markdown("</div></div>", unsafe_allow_html=True)
