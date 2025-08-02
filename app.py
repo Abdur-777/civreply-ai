@@ -10,6 +10,7 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 # === THEME ===
 WYNDHAM_BLUE = "#36A9E1"
 WYNDHAM_LIGHT = "#e3f3fa"
+ADMIN_PASSWORD = "wyndham2025"  # CHANGE THIS to your own strong password!
 
 st.set_page_config(page_title="CivReply AI", page_icon="🏛️", layout="wide")
 
@@ -39,7 +40,8 @@ PLAN_CONFIG = {
             "PDF export of chats",
             "Multi-language Q&A",
             "Bulk data uploads",
-            "Custom council branding"
+            "Custom council branding",
+            "**Contact sales to upgrade**"
         ],
     },
     "enterprise": {
@@ -55,17 +57,18 @@ PLAN_CONFIG = {
             "Staff training sessions",
             "Integration with 3rd party tools (Teams, Slack, etc.)",
             "On-premise/cloud deployment options",
-            "Custom workflow automations"
+            "Custom workflow automations",
+            "**Contact sales to upgrade**"
         ],
     }
 }
 
-# === ENV VAR CHECK ===
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_KEY:
     st.error("❌ Missing OpenAI API Key. Please set `OPENAI_API_KEY` in your environment.")
     st.stop()
 
+# === STATE INIT ===
 st.session_state.setdefault("chat_history", [])
 st.session_state.setdefault("query_count", 0)
 st.session_state.setdefault("user_role", "Resident")
@@ -73,6 +76,7 @@ st.session_state.setdefault("plan", "basic")
 st.session_state.setdefault("language", "English")
 st.session_state.setdefault("council", "Wyndham")
 st.session_state.setdefault("session_start", datetime.now().isoformat())
+st.session_state.setdefault("admin_verified", False)
 
 # === TOP HEADER (COLORED + LOGO) ===
 st.markdown(
@@ -86,7 +90,7 @@ st.markdown(
     """, unsafe_allow_html=True
 )
 
-# === PLAN BADGE & CONTROLS BAR (COLORED) ===
+# === PLAN BADGE & CONTROLS BAR ===
 st.markdown(
     f"""
     <div style='background:{WYNDHAM_LIGHT};border-radius:16px;padding:16px 32px;display:flex;justify-content:center;align-items:center;gap:50px;margin-top:20px;margin-bottom:12px;'>
@@ -100,38 +104,38 @@ st.markdown(
         </div>
         <div>
             <span style='color:#2078b2;font-size:1.1rem;font-weight:700'>Language:</span>
+            <span style='font-weight:700;'>English</span>
         </div>
-        <div style="margin-top:-10px;">
-            """,
-    unsafe_allow_html=True
+    </div>
+    """, unsafe_allow_html=True
 )
-st.session_state.language = st.selectbox(
-    "",
-    options=["English", "Arabic", "Chinese", "Hindi", "Spanish"],
-    index=["English", "Arabic", "Chinese", "Hindi", "Spanish"].index(st.session_state.language)
-    if st.session_state.get("language") in ["English", "Arabic", "Chinese", "Hindi", "Spanish"]
-    else 0,
-    label_visibility="collapsed"
-)
-st.markdown("</div>", unsafe_allow_html=True)
 
-# === CONTROLS BAR END ===
-# Role Selector
+# === Role Selector (centered) ===
 col1, col2, col3 = st.columns([1,2,1])
 with col2:
     st.markdown(
-        "<div style='margin-top:12px;margin-bottom:0;font-size:1.08rem;font-weight:700;color:#2078b2;'>Select Role</div>",
+        "<div style='margin-top:12px;margin-bottom:0;font-size:1.08rem;font-weight:700;color:#2078b2;text-align:center;'>Select Role</div>",
         unsafe_allow_html=True,
     )
-    st.session_state.user_role = st.selectbox(
+    user_role = st.selectbox(
         "",
         options=["Resident", "Staff", "Visitor"],
         index=["Resident", "Staff", "Visitor"].index(st.session_state.get("user_role", "Resident")),
         label_visibility="collapsed"
     )
-    # Only Staff can change plan live (admin control)
-    if st.session_state.user_role == "Staff":
-        st.markdown("<div style='margin-top:10px;font-weight:600;'>🛠️ Admin Plan Control</div>", unsafe_allow_html=True)
+    st.session_state.user_role = user_role
+
+    # Staff password check
+    if user_role == "Staff" and not st.session_state.admin_verified:
+        pw = st.text_input("Enter Staff Password", type="password", key="pwcheck")
+        if pw and pw == ADMIN_PASSWORD:
+            st.session_state.admin_verified = True
+            st.success("Staff access granted!")
+        elif pw and pw != ADMIN_PASSWORD:
+            st.error("Incorrect password. Please try again.")
+            st.session_state.user_role = "Resident"
+    if user_role == "Staff" and st.session_state.admin_verified:
+        st.markdown("<div style='margin-top:10px;font-weight:600;text-align:center;'>🛠️ Admin Plan Control</div>", unsafe_allow_html=True)
         st.session_state.plan = st.selectbox(
             "",
             options=["basic", "standard", "enterprise"],
@@ -139,6 +143,9 @@ with col2:
             key="admin_plan_selector",
             label_visibility="collapsed"
         )
+    elif user_role != "Staff":
+        st.session_state.admin_verified = False
+
 st.markdown("<hr style='margin-top:28px;margin-bottom:4px;border:1.2px solid #d8eafe;border-radius:6px;'>", unsafe_allow_html=True)
 
 # === SIDEBAR ===
@@ -161,6 +168,7 @@ with st.sidebar:
             "📊 Stats & Session",
             "💡 Share Feedback",
             "📞 Contact Us",
+            "ℹ️ About Us",
             "⚙️ Admin Panel"
         ],
         label_visibility="collapsed"
@@ -169,9 +177,9 @@ with st.sidebar:
     last_5 = [q for q, a in st.session_state.chat_history[-5:]]
     if last_5:
         for q in reversed(last_5):
-            st.markdown(f"<div style='padding:8px 0; font-size:15px;color:#235b7d;'>{q}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='padding:8px 0; text-align:center; font-size:15px;color:#235b7d;'>{q}</div>", unsafe_allow_html=True)
     else:
-        st.markdown("<span style='color:#7eb7d8;'>No chats yet</span>", unsafe_allow_html=True)
+        st.markdown("<span style='color:#7eb7d8;text-align:center;display:block;'>No chats yet</span>", unsafe_allow_html=True)
     # UPGRADES CARD (below chats)
     st.markdown(
         f"""
@@ -263,9 +271,23 @@ elif nav == "📞 Contact Us":
     st.markdown("**Mail:** PO Box 197")
     st.link_button("Website", "https://www.wyndham.vic.gov.au")
 
+elif nav == "ℹ️ About Us":
+    st.markdown(
+        """
+        ### About Wyndham City & CivReply AI
+
+        **Wyndham City** is one of Australia’s fastest-growing and most diverse municipalities, representing the vibrant communities of Werribee, Point Cook, Tarneit, and beyond. The council is dedicated to delivering world-class community services, sustainability initiatives, smart city technology, and transparent governance for all residents, visitors, and businesses.
+
+        **CivReply AI** is an innovative AI-powered assistant that empowers citizens and staff to instantly access council documents, policies, and services. It enables fast, accurate answers, streamlined workflows, and modern digital experiences for everyone in Wyndham.
+
+        *“Smarter answers for smarter communities.”*
+        """,
+        unsafe_allow_html=True
+    )
+
 elif nav == "⚙️ Admin Panel":
-    if st.session_state.user_role != "Staff":
-        st.warning("Restricted to council staff only.")
+    if st.session_state.user_role != "Staff" or not st.session_state.admin_verified:
+        st.warning("Restricted to council staff only. Please select 'Staff' and enter the password above.")
     else:
         st.subheader("📂 Upload New Council Docs")
         docs = st.file_uploader("Upload PDFs", type="pdf", accept_multiple_files=True)
@@ -299,11 +321,12 @@ if st.session_state.get("plan") in ["basic", "standard", "enterprise"]:
     cols = st.columns(3)
     for i, (plan_key, plan) in enumerate(PLAN_CONFIG.items()):
         with cols[i]:
+            price = plan['label'].split('(')[1][:-4]
             st.markdown(
                 f"""
                 <div style='background:#fff;border-radius:20px;box-shadow:0 6px 30px #c1e3f4;padding:30px 20px 20px 20px;margin-bottom:18px;min-height:380px;'>
                   <div style="font-size:1.3rem;font-weight:700;color:#2078b2;margin-bottom:8px;">{plan['label'].split('(')[0]}</div>
-                  <div style="font-size:2.1rem;font-weight:900;color:{WYNDHAM_BLUE};margin-bottom:5px;">{plan['label'].split('(')[1][:-4]}</div>
+                  <div style="font-size:2.1rem;font-weight:900;color:{WYNDHAM_BLUE};margin-bottom:5px;">{price} AUD</div>
                   <div style='color:#555;margin-bottom:20px;'>{' / month'}</div>
                   <div style="margin-bottom:8px;">
                     <ul style="padding-left:18px;font-size:1.09rem;line-height:1.7;">
@@ -313,4 +336,4 @@ if st.session_state.get("plan") in ["basic", "standard", "enterprise"]:
                 </div>
                 """, unsafe_allow_html=True
             )
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div></div>", unsafe_allow_html=True)
