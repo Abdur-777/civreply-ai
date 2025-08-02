@@ -321,5 +321,14 @@ if st.session_state.get("plan") in ["basic", "standard", "enterprise"]:
                   <div style="font-size:2rem;font-weight:800;color:{WYNDHAM_BLUE};margin-bottom:6px;">{price} AUD</div>
                   <div style='color:#555;margin-bottom:20px;'>/ month</div>
                   <div style="margin-bottom:10px;">
-                    <ul style="padding-left:18px;font-size:1.12rem;line-height:1.7
+                    <ul style="padding-left:18px;font-size:1.12rem;line-height:1.7;">
+                      {''.join([f"<li style='margin-bottom:4px;color:#1374ab'>{f}</li>" for f in plan['features']])
 ```
+
+
+} </ul> </div>
+{('<div style="margin-top:18px;"><a href="mailto:sales@civreply.com?subject=CivReply%20Plan%20Upgrade%20Enquiry" style="background:#36A9E1;color:#fff;font-weight:700;padding:10px 28px;border-radius:12px;text-decoration:none;display:inline-block;font-size:1.13rem;box-shadow:0 2px 6px #bae3fc;">Contact Sales</a></div>' if plan\_key in \['standard', 'enterprise'] else '')} </div>
+""",
+unsafe\_allow\_html=True
+)
+st.markdown("</div></div>", unsafe\_allow\_html=True)
