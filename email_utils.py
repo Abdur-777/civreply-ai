@@ -4,7 +4,7 @@ import os
 def send_civreply_email(
     user_email, question, answer, pdf_paths, 
     gmail_user="civreplywyndham@gmail.com", 
-    gmail_app_password="your_app_password"   # <--- Put your real app password here!
+    gmail_app_password="lcjbssomhwkqalbm"   
 ):
     subject = "CivReply AI – Your Council Question Answered"
 
