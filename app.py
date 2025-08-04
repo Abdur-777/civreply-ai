@@ -7,6 +7,33 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 
+# =========== EMAIL FUNCTION ===========
+def send_ai_email(receiver, user_question, ai_answer, source_link):
+    import yagmail
+    # Use Streamlit secrets for better security
+    GMAIL_USER = st.secrets.get("GMAIL_USER", "civreplywyndham@gmail.com")
+    GMAIL_APP_PASSWORD = st.secrets.get("GMAIL_APP_PASSWORD", "YOUR_APP_PASSWORD")
+    subject = f"CivReply AI – Answer to your question: '{user_question}'"
+    body = f"""
+    Hello,
+
+    Thank you for reaching out to Wyndham Council!
+
+    Here’s the answer to your question:
+    ---
+    {ai_answer}
+    ---
+
+    For more details, please see: {source_link}
+
+    If you have more questions, just reply to this email.
+
+    Best regards,  
+    CivReply AI Team
+    """
+    yag = yagmail.SMTP(GMAIL_USER, GMAIL_APP_PASSWORD)
+    yag.send(to=receiver, subject=subject, contents=body)
+
 # ===== THEME AND CONFIG =====
 WYNDHAM_BLUE = "#36A9E1"
 WYNDHAM_DEEP = "#2078b2"
@@ -81,7 +108,7 @@ st.session_state.setdefault("council", "Wyndham")
 st.session_state.setdefault("session_start", datetime.now().isoformat())
 st.session_state.setdefault("admin_verified", False)
 
-# ===== HEADER: Big Icon + Large Text =====
+# ===== HEADER =====
 st.markdown(
     f"""
     <div style='background:linear-gradient(90deg,{WYNDHAM_BLUE},#7ecaf6 100%);padding:44px 0 24px 0;border-radius:0 0 44px 44px;box-shadow:0 10px 40px #cce5f7;display:flex;align-items:center;justify-content:center;gap:34px;'>
@@ -106,7 +133,7 @@ st.markdown(
     """, unsafe_allow_html=True
 )
 
-# ===== HERO WELCOME SECTION =====
+# ===== HERO SECTION =====
 st.markdown(
     f"""
     <div style="background:{WYNDHAM_LIGHT};border-radius:20px;padding:28px 46px 22px 46px;margin:26px 0 32px 0;box-shadow:0 2px 16px #cdeafe;">
@@ -138,7 +165,7 @@ for i, ex in enumerate(EXAMPLES):
         if st.button(ex, key=f"ex{i}"):
             st.session_state['chat_input'] = ex
 
-# ===== HOW IT WORKS (EXPANDER) =====
+# ===== HOW IT WORKS =====
 with st.expander("How does CivReply AI work?", expanded=False):
     st.markdown("""
       1. **Type your question** about council policies, forms, or services.
@@ -247,6 +274,21 @@ if nav == "💬 Chat with Council AI":
         ai_reply = ask_ai(user_input, st.session_state.council)
         st.markdown(f"**Auto-response from Wyndham Council:**\n\n{ai_reply}")
         st.session_state.chat_history.append((user_input, ai_reply))
+
+        # ==== EMAIL ANSWER FEATURE ====
+        st.markdown("---")
+        st.markdown("### 📧 Want this answer in your email?")
+        receiver = st.text_input("Enter your email to receive this answer:", key="emailinput")
+        source_link = "https://www.wyndham.vic.gov.au"  # You can make this dynamic if needed
+        if st.button("Send answer to my email"):
+            if receiver and "@" in receiver and "." in receiver:
+                try:
+                    send_ai_email(receiver, user_input, ai_reply, source_link)
+                    st.success("✅ AI answer sent to your email!")
+                except Exception as e:
+                    st.error(f"❌ Failed to send email: {e}")
+            else:
+                st.error("Please enter a valid email address.")
 
 elif nav == "📥 Submit a Request":
     st.markdown("📌 Redirecting to your council’s website.")
