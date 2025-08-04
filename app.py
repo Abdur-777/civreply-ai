@@ -6,13 +6,37 @@ from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from dotenv import load_dotenv
+
+# --- LOAD ENV (for local dev or Render, will not overwrite Streamlit secrets) ---
+load_dotenv()
+
+# ============ SECURE KEY ACCESS =============
+def get_secret(key, fallback_env=None, default=None):
+    """Try st.secrets, then environment, then default."""
+    try:
+        return st.secrets[key]
+    except Exception:
+        if fallback_env:
+            return os.getenv(fallback_env, default)
+        return default
+
+OPENAI_KEY = get_secret("OPENAI_KEY", "OPENAI_API_KEY")
+GMAIL_USER = get_secret("GMAIL_USER")
+GMAIL_APP_PASSWORD = get_secret("GMAIL_APP_PASSWORD")
+
+if not OPENAI_KEY:
+    st.error("❌ Missing OpenAI API Key. Set in .env or .streamlit/secrets.toml.")
+    st.stop()
+if not GMAIL_USER or not GMAIL_APP_PASSWORD:
+    st.warning("⚠️ Email support is not configured (set GMAIL_USER and GMAIL_APP_PASSWORD in secrets.toml or .env).")
 
 # =========== EMAIL FUNCTION ===========
 def send_ai_email(receiver, user_question, ai_answer, source_link):
     import yagmail
-    # Use Streamlit secrets for better security
-    GMAIL_USER = st.secrets.get("GMAIL_USER", "civreplywyndham@gmail.com")
-    GMAIL_APP_PASSWORD = st.secrets.get("GMAIL_APP_PASSWORD", "YOUR_APP_PASSWORD")
+    if not (GMAIL_USER and GMAIL_APP_PASSWORD):
+        st.error("Email support not configured!")
+        return
     subject = f"CivReply AI – Answer to your question: '{user_question}'"
     body = f"""
     Hello,
@@ -93,11 +117,6 @@ PLAN_CONFIG = {
         ],
     }
 }
-
-OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_KEY:
-    st.error("❌ Missing OpenAI API Key. Please set `OPENAI_API_KEY` in your environment.")
-    st.stop()
 
 st.session_state.setdefault("chat_history", [])
 st.session_state.setdefault("query_count", 0)
@@ -199,7 +218,6 @@ with st.sidebar:
         ],
         label_visibility="collapsed"
     )
-    # Recent Chats
     st.markdown("<div style='text-align:center;font-size:1.12rem;font-weight:700;color:#235b7d;margin:16px 0 0 0;'>Recent Chats</div>", unsafe_allow_html=True)
     last_5 = [q for q, a in st.session_state.get("chat_history", [])[-5:]]
     if last_5:
@@ -207,7 +225,6 @@ with st.sidebar:
             st.markdown(f"<div style='padding:10px 0; text-align:center; font-size:15.5px;color:#2078b2;'>{q}</div>", unsafe_allow_html=True)
     else:
         st.markdown("<span style='color:#7eb7d8;text-align:center;display:block;'>No chats yet</span>", unsafe_allow_html=True)
-    # ---- UPGRADE PLAN CARD ----
     with st.expander("🚀 Upgrade Your Plan", expanded=False):
         for plan_key, plan in PLAN_CONFIG.items():
             st.markdown(
@@ -352,7 +369,6 @@ elif nav == "⚙️ Admin Panel":
             else:
                 st.warning("Please upload at least one document.")
 
-# (Optional footer)
 st.markdown(
     "<div style='text-align:center; color:#b2c6d6; font-size:0.96rem; margin:32px 0 8px 0;'>Made with 🏛️ CivReply AI – for Australian councils, powered by AI</div>",
     unsafe_allow_html=True
