@@ -6,55 +6,31 @@ from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from dotenv import load_dotenv
-
-# --- LOAD ENV (for local dev or Render, will not overwrite Streamlit secrets) ---
-load_dotenv()
-
-# ============ SECURE KEY ACCESS =============
-def get_secret(key, fallback_env=None, default=None):
-    """Try st.secrets, then environment, then default."""
-    try:
-        return st.secrets[key]
-    except Exception:
-        if fallback_env:
-            return os.getenv(fallback_env, default)
-        return default
-
-OPENAI_KEY = get_secret("OPENAI_KEY", "OPENAI_API_KEY")
-GMAIL_USER = get_secret("GMAIL_USER")
-GMAIL_APP_PASSWORD = get_secret("GMAIL_APP_PASSWORD")
-
-if not OPENAI_KEY:
-    st.error("❌ Missing OpenAI API Key. Set in .env or .streamlit/secrets.toml.")
-    st.stop()
-if not GMAIL_USER or not GMAIL_APP_PASSWORD:
-    st.warning("⚠️ Email support is not configured (set GMAIL_USER and GMAIL_APP_PASSWORD in secrets.toml or .env).")
 
 # =========== EMAIL FUNCTION ===========
-def send_ai_email(receiver, user_question, ai_answer, source_link):
+def send_ai_email(receiver, user_question, ai_answer, source_link, source_doc=None, page=None):
     import yagmail
-    if not (GMAIL_USER and GMAIL_APP_PASSWORD):
-        st.error("Email support not configured!")
-        return
+    # Prefer secrets, fall back to env
+    GMAIL_USER = st.secrets.get("GMAIL_USER", os.environ.get("GMAIL_USER", "civreplywyndham@gmail.com"))
+    GMAIL_APP_PASSWORD = st.secrets.get("GMAIL_APP_PASSWORD", os.environ.get("GMAIL_APP_PASSWORD", "YOUR_APP_PASSWORD"))
     subject = f"CivReply AI – Answer to your question: '{user_question}'"
     body = f"""
-    Hello,
+Hello,
 
-    Thank you for reaching out to Wyndham Council!
+Thank you for reaching out to Wyndham Council!
 
-    Here’s the answer to your question:
-    ---
-    {ai_answer}
-    ---
-
-    For more details, please see: {source_link}
-
-    If you have more questions, just reply to this email.
-
-    Best regards,  
-    CivReply AI Team
-    """
+Here’s the answer to your question:
+---
+{ai_answer}
+---
+"""
+    if source_doc:
+        body += f"\nSource document: {source_doc}"
+        if page:
+            body += f", page {page}"
+    if source_link:
+        body += f"\n\nFor more details, please see: {source_link}"
+    body += "\n\nIf you have more questions, just reply to this email.\n\nBest regards,\nCivReply AI Team"
     yag = yagmail.SMTP(GMAIL_USER, GMAIL_APP_PASSWORD)
     yag.send(to=receiver, subject=subject, contents=body)
 
@@ -117,6 +93,11 @@ PLAN_CONFIG = {
         ],
     }
 }
+
+OPENAI_KEY = st.secrets.get("OPENAI_API_KEY", os.environ.get("OPENAI_API_KEY"))
+if not OPENAI_KEY:
+    st.error("❌ Missing OpenAI API Key. Please set `OPENAI_API_KEY` in .env or secrets.toml.")
+    st.stop()
 
 st.session_state.setdefault("chat_history", [])
 st.session_state.setdefault("query_count", 0)
@@ -218,6 +199,7 @@ with st.sidebar:
         ],
         label_visibility="collapsed"
     )
+    # Recent Chats
     st.markdown("<div style='text-align:center;font-size:1.12rem;font-weight:700;color:#235b7d;margin:16px 0 0 0;'>Recent Chats</div>", unsafe_allow_html=True)
     last_5 = [q for q, a in st.session_state.get("chat_history", [])[-5:]]
     if last_5:
@@ -225,6 +207,7 @@ with st.sidebar:
             st.markdown(f"<div style='padding:10px 0; text-align:center; font-size:15.5px;color:#2078b2;'>{q}</div>", unsafe_allow_html=True)
     else:
         st.markdown("<span style='color:#7eb7d8;text-align:center;display:block;'>No chats yet</span>", unsafe_allow_html=True)
+    # ---- UPGRADE PLAN CARD ----
     with st.expander("🚀 Upgrade Your Plan", expanded=False):
         for plan_key, plan in PLAN_CONFIG.items():
             st.markdown(
@@ -247,18 +230,16 @@ def ask_ai(question, council):
     embeddings = OpenAIEmbeddings()
     index_path = f"index/{council.lower()}"
     if not os.path.exists(index_path):
-        return "[Error] No index found for this council"
+        return {"answer": "[Error] No index found for this council", "source": None, "page": None, "link": None}
     db = FAISS.load_local(index_path, embeddings)
     retriever = db.as_retriever()
+    # Configure LLM per plan
     if plan == "basic":
         llm = ChatOpenAI(api_key=OPENAI_KEY, model="gpt-3.5-turbo")
         prompt = "You are a helpful council assistant. Only answer from the provided documents. Always respond in English."
-    elif plan == "standard":
+    elif plan in ["standard", "enterprise"]:
         llm = ChatOpenAI(api_key=OPENAI_KEY, model="gpt-4o")
-        prompt = "You are a council assistant with advanced extraction and analytics skills. Always respond in English."
-    elif plan == "enterprise":
-        llm = ChatOpenAI(api_key=OPENAI_KEY, model="gpt-4o")
-        prompt = "You are an enterprise-grade council AI with API, integrations, automations, and full workflow capabilities. Always respond in English."
+        prompt = "You are a council assistant with advanced skills. Always respond in English."
     else:
         llm = ChatOpenAI(api_key=OPENAI_KEY)
         prompt = "Always respond in English."
@@ -266,9 +247,24 @@ def ask_ai(question, council):
         llm=llm,
         chain_type="stuff",
         retriever=retriever,
-        chain_type_kwargs={"prompt": prompt} if prompt else None,
+        return_source_documents=True,
+        chain_type_kwargs={"prompt": prompt}
     )
-    return qa.run(question)
+    result = qa({"query": question})
+    answer = result['result']
+    # Extract source link
+    source = None
+    page = None
+    link = None
+    if result.get('source_documents'):
+        doc = result['source_documents'][0]
+        source = doc.metadata.get("source")
+        page = doc.metadata.get("page", None)
+        # Assume PDF is in docs/<council>/<filename>
+        filename = os.path.basename(source) if source else None
+        if filename:
+            link = f"https://www.wyndham.vic.gov.au/documents/{filename}"
+    return {"answer": answer, "source": source, "page": page, "link": link}
 
 def log_feedback(text, email):
     with open("feedback_log.txt", "a") as f:
@@ -288,19 +284,28 @@ if nav == "💬 Chat with Council AI":
     if user_input:
         st.session_state.query_count += 1
         st.write(user_input)
-        ai_reply = ask_ai(user_input, st.session_state.council)
-        st.markdown(f"**Auto-response from Wyndham Council:**\n\n{ai_reply}")
-        st.session_state.chat_history.append((user_input, ai_reply))
+        ai_data = ask_ai(user_input, st.session_state.council)
+        ai_answer = ai_data["answer"]
+        ai_source = ai_data.get("source")
+        ai_page = ai_data.get("page")
+        ai_link = ai_data.get("link") or "https://www.wyndham.vic.gov.au"
+
+        st.markdown(f"**Auto-response from Wyndham Council:**\n\n{ai_answer}")
+        if ai_source:
+            st.markdown(f"**Source Document:** {ai_source}" + (f", Page: {ai_page}" if ai_page else ""))
+        if ai_link:
+            st.markdown(f"[View PDF]({ai_link})")
+
+        st.session_state.chat_history.append((user_input, ai_answer))
 
         # ==== EMAIL ANSWER FEATURE ====
         st.markdown("---")
         st.markdown("### 📧 Want this answer in your email?")
         receiver = st.text_input("Enter your email to receive this answer:", key="emailinput")
-        source_link = "https://www.wyndham.vic.gov.au"  # You can make this dynamic if needed
         if st.button("Send answer to my email"):
             if receiver and "@" in receiver and "." in receiver:
                 try:
-                    send_ai_email(receiver, user_input, ai_reply, source_link)
+                    send_ai_email(receiver, user_input, ai_answer, ai_link, ai_source, ai_page)
                     st.success("✅ AI answer sent to your email!")
                 except Exception as e:
                     st.error(f"❌ Failed to send email: {e}")
@@ -369,6 +374,7 @@ elif nav == "⚙️ Admin Panel":
             else:
                 st.warning("Please upload at least one document.")
 
+# (Optional footer)
 st.markdown(
     "<div style='text-align:center; color:#b2c6d6; font-size:0.96rem; margin:32px 0 8px 0;'>Made with 🏛️ CivReply AI – for Australian councils, powered by AI</div>",
     unsafe_allow_html=True
