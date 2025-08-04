@@ -1,33 +1,25 @@
-# UI
-streamlit>=1.32
+streamlit==1.32.0
 
-# LLM + LangChain
-openai>=1.30
-tiktoken>=0.7
-langchain>=0.2
-langchain-community>=0.2
-langchain-openai>=0.1
+openai==1.30.5
+tiktoken==0.7.0
+langchain==0.2.3
+langchain-community==0.2.3
+langchain-openai==0.1.3
 
-# Vector store (choose ONE: FAISS or Chroma)
-faiss-cpu>=1.8
-# chromadb>=0.5   
+faiss-cpu==1.8.0
+# chromadb==0.5.0   # Uncomment if you use Chroma, but not with FAISS!
 
-# PDF handling
-pypdf>=4.0
-pdfplumber>=0.11      
+pypdf==4.1.0
+pdfplumber==0.11.0
 
-# Utilities used in your app
-python-dotenv>=1.0
-pandas>=2.0
-numpy>=1.26
-requests>=2.31
-tenacity>=8.2
+python-dotenv==1.0.1
+pandas==2.2.2
+numpy==1.26.4
+requests==2.31.0
+tenacity==8.2.3
 
-# Email
-yagmail>=0.15
+yagmail==0.15.293
 
-# For PDF export of chats
-fpdf>=1.7
+fpdf==1.7.2
 
-# For translation (multi-language Q&A)
-googletrans==4.0.0-rc1
+googletrans==4.0.0rc1
