@@ -58,5 +58,19 @@
     "hero_image": "https://upload.wikimedia.org/wikipedia/en/8/86/Knox_City_Council_Logo.png",
     "about": "Find info on waste, pets, rates, and more instantly.",
     "plan": "basic"
-  }
-}
+  },
+  "yarra": {
+    "tagline": "Smart support for Yarra’s creative community.",
+    "hero_image": "https://upload.wikimedia.org/wikipedia/commons/5/56/City_of_Yarra_Logo.png",
+    "about": "From Fitzroy to Richmond—get your Yarra council answers here.",
+    "plan": "standard"
+  },
+  "port_phillip": {
+    "tagline": "From St Kilda to South Melbourne, AI at your service.",
+    "hero_image": "https://upload.wikimedia.org/wikipedia/commons/f/fd/Port_Phillip_City_Council_Logo.png",
+    "about": "Port Phillip Council for beaches, permits, arts, and more.",
+    "plan": "standard"
+  },
+  "whitehorse": {
+    "tagline": "Supporting Box Hill, Nunawading, and all Whitehorse.",
+    "hero_image": "https://upload.wikimedia.org/wikipedia/en/f/fc/Whitehorse_C
