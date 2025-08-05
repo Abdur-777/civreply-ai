@@ -16,13 +16,6 @@ COUNCILS = [
 DEFAULT_COUNCIL = COUNCILS[0]
 ADMIN_EMAILS = ["admin@civreply.ai"]
 
-st.set_page_config(
-    page_title="CivReply AI – Council Q&A",
-    page_icon="🏛️",
-    layout="wide",
-    menu_items={"About": "CivReply AI is an open-source council Q&A app powered by AI."}
-)
-
 APP_ABOUT = """
 CivReply AI answers any question from your local council's official documents (PDFs). Upload, index, and manage your knowledge base instantly.
 """
@@ -67,7 +60,14 @@ os.makedirs(pdf_dir, exist_ok=True)
 st.sidebar.markdown("---")
 st.sidebar.info(f"Council Knowledgebase: `{council}`")
 
-# ========================== PLAN/STATS (Demo Only) ==========================
+# ========================== SIDEBAR: TEAM & HELP ==========================
+with st.sidebar.expander("👥 Team", expanded=False):
+    st.write("Project Lead: Abdullah Arshad\nBackend: GPT-4\nContact: admin@civreply.ai")
+
+with st.sidebar.expander("❓ Help & FAQ", expanded=False):
+    st.write("• Upload PDFs (Staff/Admin)\n• Build index\n• Ask any question\n• Download your chat history")
+
+# ========================== USAGE STATS ==========================
 if "usage_stats" not in st.session_state:
     st.session_state.usage_stats = {}
 
@@ -79,6 +79,22 @@ def increment_usage(council):
 st.title("🏛️ CivReply AI")
 st.caption(APP_ABOUT)
 st.markdown("---")
+
+# ========================== COUNCIL INFO BLOCK ==========================
+COUNCIL_INFOS = {
+    "Casey": "City of Casey, southeast of Melbourne CBD. Population 365,000+.",
+    "Wyndham": "Wyndham is one of Australia's fastest-growing councils, in the west.",
+    "Whittlesea": "Located north of Melbourne, large multicultural community.",
+    "Greater Dandenong": "Vibrant, diverse, strong manufacturing history.",
+    "Hume": "Home to the airport and key industrial precincts.",
+    "Melton": "One of the most rapidly urbanizing areas.",
+    "Brimbank": "Biggest municipality in Melbourne’s west.",
+    "Melbourne": "CBD, university, commerce, and culture hub.",
+    "Monash": "Known for Monash Uni, business, leafy suburbs.",
+    "Boroondara": "Historic, leafy, high quality-of-life, in inner-east."
+}
+with st.expander("ℹ️ About this council", expanded=False):
+    st.info(COUNCIL_INFOS.get(council, "No data. Contact admin to add council info!"))
 
 # ========================== INDEX MANAGEMENT ==========================
 def build_index(pdf_dir, index_dir):
@@ -142,43 +158,51 @@ qa = RetrievalQA.from_chain_type(
     retriever=db.as_retriever(),
 )
 
-# ========================== MAIN CHAT UI ==========================
+# ========================== CHAT SESSION PER COUNCIL ==========================
+if "chat_sessions" not in st.session_state:
+    st.session_state.chat_sessions = {c: [] for c in COUNCILS}
+
+def get_current_chat():
+    return st.session_state.chat_sessions[council]
+
+def add_to_chat_history(q, a):
+    st.session_state.chat_sessions[council].append({
+        "timestamp": datetime.now().isoformat(),
+        "council": council,
+        "role": role,
+        "user": st.session_state.user_email,
+        "question": q,
+        "answer": a
+    })
+
+# ========================== MAIN Q&A UI ==========================
 st.header(f"💬 {council} Council Chatbot")
 st.markdown("Ask anything about policies, local laws, plans, council forms, and more:")
-
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
 user_query = st.text_input("Type your question here:")
 
 if st.button("Ask AI") or user_query:
     with st.spinner("Thinking..."):
         ai_answer = qa({"query": user_query})["result"]
     increment_usage(council)
-    st.session_state.chat_history.append({
-        "timestamp": datetime.now().isoformat(),
-        "council": council,
-        "role": role,
-        "user": st.session_state.user_email,
-        "question": user_query,
-        "answer": ai_answer
-    })
+    add_to_chat_history(user_query, ai_answer)
     st.success(ai_answer)
     st.markdown("---")
     st.markdown("##### Recent Q&A")
-    for chat in reversed(st.session_state.chat_history[-3:]):
+    for chat in reversed(get_current_chat()[-3:]):
         st.markdown(f"**Q:** {chat['question']}\n\n**A:** {chat['answer']}")
 
 # ========================== USAGE STATS ==========================
 with st.expander("📊 Usage Stats"):
     usage = st.session_state.usage_stats.get(council, 0)
     st.metric("Questions asked for this council", usage)
-    st.write(f"Chat history entries: {len(st.session_state.chat_history)}")
+    st.write(f"Chat history entries (this council): {len(get_current_chat())}")
+    st.write("Total chats (all councils):", sum(len(s) for s in st.session_state.chat_sessions.values()))
 
 # ========================== CHAT EXPORT ==========================
 with st.expander("🗃️ Export Chat History"):
-    if st.session_state.chat_history:
-        df = pd.DataFrame(st.session_state.chat_history)
+    chat_history = get_current_chat()
+    if chat_history:
+        df = pd.DataFrame(chat_history)
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button(
             label="Download Q&A History as CSV",
@@ -187,16 +211,28 @@ with st.expander("🗃️ Export Chat History"):
             mime='text/csv',
         )
     else:
-        st.info("No chat history yet to export.")
+        st.info("No chat history yet to export for this council.")
 
-# ========================== ABOUT & FOOTER ==========================
+# ========================== FEEDBACK & ABOUT ==========================
+with st.expander("💡 Feedback & Feature Requests"):
+    feedback = st.text_area("Share feedback or suggest a new feature:")
+    if st.button("Submit Feedback"):
+        if feedback.strip():
+            with open("feedback_log.txt", "a") as f:
+                f.write(f"{datetime.now().isoformat()} | {st.session_state.user_email} | {council} | {feedback}\n")
+            st.success("Thank you for your feedback!")
+        else:
+            st.warning("Please enter feedback before submitting.")
+
 with st.expander("ℹ️ About CivReply AI"):
     st.write(APP_ABOUT)
     st.write("For more features, contributions, or to request a new council, email admin@civreply.ai.")
+    st.write("This is an open-source, community-powered knowledge platform.")
 
+# ========================== BRANDING BLOCK ==========================
 st.markdown("---")
 st.markdown(
     "<div style='text-align:center; color:#b2c6d6; font-size:0.96rem; margin:32px 0 8px 0;'>"
-    "Made with 🏛️ CivReply AI – for Melbourne councils, powered by AI</div>",
+    "Made with 🏛️ CivReply AI – for Melbourne councils, powered by AI | 2025</div>",
     unsafe_allow_html=True
 )
