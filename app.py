@@ -5,7 +5,6 @@ import pandas as pd
 from deep_translator import GoogleTranslator
 from fpdf import FPDF
 
-# Langchain + OpenAI
 from langchain.chains import RetrievalQA
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -18,7 +17,8 @@ import pdfplumber  # For form scraping
 WYNDHAM_BLUE = "#36A9E1"
 WYNDHAM_DEEP = "#2078b2"
 WYNDHAM_LIGHT = "#e3f3fa"
-ADMIN_PASSWORD = "llama"
+ADMIN_PASSWORD = "llama"        # Change to secure value in st.secrets
+STAFF_PASSWORD = "staff2024"    # Change to secure value in st.secrets
 
 LANGUAGES = {
     "English": "en",
@@ -101,8 +101,8 @@ def translate_text(text, target_lang):
 
 def send_ai_email(receiver, user_question, ai_answer, source_link):
     import yagmail
-    GMAIL_USER = st.secrets.get("GMAIL_USER", "civreplywyndham@gmail.com")
-    GMAIL_APP_PASSWORD = st.secrets.get("GMAIL_APP_PASSWORD", "YOUR_APP_PASSWORD")
+    GMAIL_USER = st.secrets["GMAIL_USER"]
+    GMAIL_APP_PASSWORD = st.secrets["GMAIL_APP_PASSWORD"]
     subject = f"CivReply AI – Answer to your question: '{user_question}'"
     body = f"""
     Hello,
@@ -123,6 +123,7 @@ def send_ai_email(receiver, user_question, ai_answer, source_link):
     """
     yag = yagmail.SMTP(GMAIL_USER, GMAIL_APP_PASSWORD)
     yag.send(to=receiver, subject=subject, contents=body)
+    # Optionally log the email to a CSV for staff review
 
 def export_chats_to_pdf(chat_history, filename):
     pdf = FPDF()
@@ -162,11 +163,15 @@ def advanced_form_scraping(pdf_path):
         for page in pdf.pages:
             text = page.extract_text()
             if text:
-                # Extract common form fields (expand as needed)
                 import re
                 fields = re.findall(r"(Name|Email|Phone|Address|Date of Birth|Signature):?\s*(.+)", text)
                 results.extend(fields)
     return results if results else [("No form fields found", "")]
+
+def log_tip(user, council, tip):
+    with open("community_tips.csv", "a") as f:
+        entry = f"{datetime.now().isoformat()} | {user} | {council} | {tip}\n"
+        f.write(entry)
 
 # ========== STREAMLIT APP ==========
 
@@ -187,6 +192,39 @@ if "session_start" not in st.session_state:
     st.session_state["session_start"] = datetime.now().isoformat()
 if "admin_verified" not in st.session_state:
     st.session_state["admin_verified"] = False
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
+# ---- Authentication UI
+st.sidebar.markdown("### 👤 User Login/Role")
+if st.session_state["user_role"] == "Resident":
+    login_choice = st.sidebar.selectbox("Select your role", ["Resident", "Staff", "Admin"])
+    st.session_state["user_role"] = login_choice
+    if login_choice == "Staff":
+        pwd = st.sidebar.text_input("Staff password", type="password")
+        if st.sidebar.button("Staff Login"):
+            if pwd == STAFF_PASSWORD:
+                st.session_state["logged_in"] = True
+                st.success("Staff logged in.")
+            else:
+                st.error("Wrong password.")
+    elif login_choice == "Admin":
+        pwd = st.sidebar.text_input("Admin password", type="password")
+        if st.sidebar.button("Admin Login"):
+            if pwd == ADMIN_PASSWORD:
+                st.session_state["logged_in"] = True
+                st.session_state["admin_verified"] = True
+                st.success("Admin logged in.")
+            else:
+                st.error("Wrong password.")
+    else:
+        st.session_state["logged_in"] = True  # Allow residents to use chat without password
+else:
+    st.session_state["logged_in"] = True
+
+if not st.session_state["logged_in"]:
+    st.warning("Please login to access full features.")
+    st.stop()
 
 # ---- Sidebar
 st.sidebar.markdown("### 🏛️ CivReply AI – Australia-wide Councils")
@@ -216,7 +254,8 @@ nav = st.sidebar.radio(
         "💡 Share Feedback",
         "📞 Contact Us",
         "ℹ️ About Us",
-        "⚙️ Admin Panel"
+        "⚙️ Admin Panel",
+        "🌐 Community Knowledge Base"
     ]
 )
 
@@ -241,26 +280,35 @@ st.markdown(
         <div style='font-weight:700;'>{PLAN_CONFIG[st.session_state["plan"]]["label"]}</div>
         <div style='color:{WYNDHAM_DEEP};font-size:1.13rem;font-weight:700'>🌐 Language:</div>
         <div style='font-weight:700;'>{selected_lang_label}</div>
+        <div style='color:{WYNDHAM_DEEP};font-size:1.13rem;font-weight:700'>🟢 User:</div>
+        <div style='font-weight:700;'>{st.session_state["user_role"]}</div>
     </div>
     """, unsafe_allow_html=True
 )
 
 # ========== MAIN ROUTES ==========
 
-def ask_ai(question, council, lang="en"):
+def ask_ai(question, council, lang="en", multi_council=False):
     plan = st.session_state["plan"]
+    # Enforce query limits per plan!
+    plan_limit = PLAN_CONFIG[plan]["limit"]
+    if plan != "enterprise" and st.session_state["query_count"] >= plan_limit:
+        st.warning(f"Query limit reached for {plan.capitalize()} plan. Please upgrade to continue.")
+        st.stop()
+    # Multi-council search stub
     embeddings = OpenAIEmbeddings()
-    index_path = f"index/{council.lower()}"
-    if not os.path.exists(index_path):
-        return "[Error] No index found for this council"
-    db = FAISS.load_local(index_path, embeddings)
-    retriever = db.as_retriever()
-    if plan == "basic":
-        llm = ChatOpenAI(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-3.5-turbo")
-        prompt = "You are a helpful council assistant. Only answer from the provided documents. Always respond in English."
+    if not multi_council:
+        index_path = f"index/{council.lower()}"
+        if not os.path.exists(index_path):
+            return "[Error] No index found for this council"
+        db = FAISS.load_local(index_path, embeddings)
+        retriever = db.as_retriever()
     else:
-        llm = ChatOpenAI(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o")
-        prompt = "You are a council AI assistant with advanced analytics, extraction, and multi-language support. Always respond in English."
+        # Future: Combine/merge all council indices
+        return "Multi-council search is an Enterprise feature. Contact us to activate."
+    llm_model = "gpt-3.5-turbo" if plan == "basic" else "gpt-4o"
+    llm = ChatOpenAI(api_key=os.getenv("OPENAI_API_KEY"), model=llm_model)
+    prompt = "You are a helpful council assistant. Only answer from the provided documents."
     qa = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
@@ -271,18 +319,22 @@ def ask_ai(question, council, lang="en"):
     return answer
 
 # --- Main App Router
+
 if nav == "💬 Chat with Council AI":
     st.subheader(f"💬 Ask {st.session_state['council']} Council")
+    if st.session_state["user_role"] == "Admin":
+        multi_council_search = st.checkbox("Enterprise: Search ALL councils at once?", value=False)
+    else:
+        multi_council_search = False
     user_input = st.chat_input("Ask a question about council policies, forms, or documents…")
     if user_input:
         st.session_state.query_count += 1
-        ai_reply = ask_ai(user_input, st.session_state["council"], lang=selected_lang)
+        ai_reply = ask_ai(user_input, st.session_state["council"], lang=selected_lang, multi_council=multi_council_search)
         update_usage_analytics(user_input, st.session_state["council"], st.session_state["user_role"], st.session_state["plan"])
-        # Translate AI reply if needed
         ai_reply_translated = translate_text(ai_reply, selected_lang)
         st.markdown(f"**Auto-response from {st.session_state['council']} Council:**\n\n{ai_reply_translated}")
         st.session_state["chat_history"].append((user_input, ai_reply_translated))
-        # PDF link extraction (show only, not download)
+        # PDF link extraction
         if "http" in ai_reply:
             import re
             links = re.findall(r'(https?://\S+)', ai_reply)
@@ -293,7 +345,7 @@ if nav == "💬 Chat with Council AI":
         st.markdown("---")
         st.markdown("### 📧 Want this answer in your email?")
         receiver = st.text_input("Enter your email to receive this answer:", key="emailinput")
-        source_link = links[0] if "links" in locals() and links else "https://www.wyndham.vic.gov.au"
+        source_link = links[0] if "links" in locals() and links else f"https://{st.session_state['council'].lower()}.vic.gov.au"
         if st.button("Send answer to my email"):
             if receiver and "@" in receiver and "." in receiver:
                 try:
@@ -315,13 +367,16 @@ elif nav == "📥 Submit a Request":
     st.link_button("📝 Submit Online", link)
 
 elif nav == "📊 Stats & Analytics":
-    st.header("📊 Usage Analytics Dashboard")
-    df = usage_analytics()
-    st.dataframe(df.tail(100), use_container_width=True)
-    st.metric("Total Questions (all time)", len(df))
-    st.metric("Session Start", st.session_state["session_start"])
-    st.metric("Current Council", st.session_state["council"])
-    st.metric("Current Plan", PLAN_CONFIG[st.session_state["plan"]]["label"])
+    if st.session_state["user_role"] not in ["Staff", "Admin"]:
+        st.warning("Admins/Staff only. Please login.")
+    else:
+        st.header("📊 Usage Analytics Dashboard")
+        df = usage_analytics()
+        st.dataframe(df.tail(100), use_container_width=True)
+        st.metric("Total Questions (all time)", len(df))
+        st.metric("Session Start", st.session_state["session_start"])
+        st.metric("Current Council", st.session_state["council"])
+        st.metric("Current Plan", PLAN_CONFIG[st.session_state["plan"]]["label"])
 
 elif nav == "🗃️ Export Chats as PDF":
     st.header("🗃️ Export Your Chat History")
@@ -332,9 +387,9 @@ elif nav == "🗃️ Export Chats as PDF":
             st.download_button("Download PDF", data=f, file_name=filename)
 
 elif nav == "📦 Bulk Data Upload":
-    st.header("📦 Bulk PDF/Data Upload (Admin Only)")
-    if st.session_state["user_role"] != "Staff":
-        st.warning("Admin access required.")
+    st.header("📦 Bulk PDF/Data Upload (Staff/Admin Only)")
+    if st.session_state["user_role"] not in ["Staff", "Admin"]:
+        st.warning("Staff/Admin access required.")
     else:
         docs = st.file_uploader("Upload PDFs", type="pdf", accept_multiple_files=True)
         if st.button("Bulk Index & Add"):
@@ -356,11 +411,14 @@ elif nav == "📦 Bulk Data Upload":
 
 elif nav == "🎨 Council Branding":
     st.header("🎨 Custom Council Branding")
-    st.markdown("This is where you’d upload and configure branding, logos, and themes per council. (Customise as needed for your use case!)")
-    uploaded_logo = st.file_uploader("Upload council logo", type=["png", "jpg", "jpeg"])
-    if uploaded_logo:
-        st.image(uploaded_logo, width=180)
-        st.success("Logo uploaded! (Not saved permanently in this demo)")
+    st.markdown("Upload branding, logos, and themes per council. (Admins only, not persistent on free Render)")
+    if st.session_state["user_role"] != "Admin":
+        st.warning("Admin access required.")
+    else:
+        uploaded_logo = st.file_uploader("Upload council logo", type=["png", "jpg", "jpeg"])
+        if uploaded_logo:
+            st.image(uploaded_logo, width=180)
+            st.success("Logo uploaded! (Demo only)")
 
 elif nav == "📝 Form Scraper":
     st.header("📝 Advanced Form Scraping (PDF)")
@@ -396,8 +454,8 @@ elif nav == "ℹ️ About Us":
 
 elif nav == "⚙️ Admin Panel":
     st.header("⚙️ Admin Panel")
-    if st.session_state["user_role"] != "Staff" or not st.session_state["admin_verified"]:
-        st.warning("Restricted to council staff only. Please select 'Staff' and enter the password above.")
+    if st.session_state["user_role"] != "Admin":
+        st.warning("Admin access required.")
     else:
         docs = st.file_uploader("Upload PDFs", type="pdf", accept_multiple_files=True)
         if st.button("Rebuild Index"):
@@ -416,6 +474,18 @@ elif nav == "⚙️ Admin Panel":
                 st.success("✅ Index rebuilt successfully.")
             else:
                 st.warning("Please upload at least one document.")
+
+elif nav == "🌐 Community Knowledge Base":
+    st.header("🌐 Community Knowledge Base")
+    st.markdown("Browse tips from other residents & staff, or add your own!")
+    if os.path.exists("community_tips.csv"):
+        tips = pd.read_csv("community_tips.csv", sep="|", names=["Timestamp", "User", "Council", "Tip"])
+        st.dataframe(tips[["Timestamp", "Council", "Tip"]].tail(50), use_container_width=True)
+    tip = st.text_area("Suggest a new tip or local info to share")
+    if st.button("Add Tip"):
+        user = st.session_state["user_role"]
+        log_tip(user, st.session_state["council"], tip)
+        st.success("Tip added! Pending admin approval.")
 
 # ========== FOOTER ==========
 st.markdown(
