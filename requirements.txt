@@ -8,10 +8,8 @@ faiss-cpu==1.8.0
 pypdf==4.1.0
 pdfplumber==0.11.0
 python-dotenv==1.0.1
-pandas==2.1.4
-numpy==1.26.4
+pandas==1.5.3
+numpy==1.23.5
 requests==2.31.0
 tenacity==8.2.3
-yagmail==0.15.293
 fpdf==1.7.2
-deep-translator==1.11.4
