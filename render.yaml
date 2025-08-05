@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: civreply-ai
+    env: python
+    plan: free
+    buildCommand: |
+      pip install --upgrade pip
+      apt-get update && apt-get install -y build-essential python3-dev
+      pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
