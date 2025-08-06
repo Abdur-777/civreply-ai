@@ -17,3 +17,4 @@ tenacity==8.2.3
 yagmail==0.15.293
 fpdf==1.7.2
 deep-translator==1.11.4
+boto3
