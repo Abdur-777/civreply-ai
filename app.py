@@ -9,13 +9,13 @@ from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain.chains import RetrievalQA   # <-- ✅ NEW: Import RetrievalQA here!
+from langchain.chains import RetrievalQA
 
 # --- CONFIG ---
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ADMIN_EMAIL = "civreplywyndham@gmail.com"
-YAGMAIL_PASS = os.getenv("YAGMAIL_PASS")  # Set this as an ENV VAR on Render, not in .env in code
+YAGMAIL_PASS = os.getenv("YAGMAIL_PASS")
 CIVREPLY_ADMIN_PASS = os.getenv("CIVREPLY_ADMIN_PASS", "admin123")
 COUNCIL = "Wyndham"
 LANG = "English"
@@ -26,7 +26,7 @@ st.set_page_config("CivReply AI", layout="wide", page_icon="🏛️")
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
 if 'plan' not in st.session_state:
-    st.session_state.plan = "Basic ($499 AUD/mo)"
+    st.session_state.plan = "Basic"
 if 'role' not in st.session_state:
     st.session_state.role = None
 if 'pdf_index' not in st.session_state:
@@ -68,7 +68,7 @@ def council_status():
         f"""
         <div style="background:#f3fafd;border-radius:14px;padding:9px 16px 7px 16px;display:flex;align-items:center;justify-content:left;font-size:16px;margin-bottom:10px;">
             <b>🏛️ Active Council:</b>&nbsp;{COUNCIL}
-            <span style="margin-left:32px"><b>💼 Plan:</b> {st.session_state.plan}</span>
+            <span style="margin-left:32px"><b>💼 Plan:</b> Basic</span>
             <span style="margin-left:32px"><b>🌐 Language:</b> {LANG}</span>
         </div>
         """, unsafe_allow_html=True
@@ -76,16 +76,11 @@ def council_status():
 
 def sidebar():
     with st.sidebar:
-        # Logo (safe fallback)
-        import os
-        if os.path.exists("logo.png"):
-            st.image("logo.png", width=170)
-        else:
-            st.write("🏛️ CivReply AI")
-        
+        # No logo image; use only icon + name
         st.markdown(
             """
-            <div style="font-size:22px;font-weight:bold;margin-top:-10px;margin-bottom:8px;color:#1899D6">
+            <div style="font-size:38px;line-height:1;margin-bottom:2px;">🏛️</div>
+            <div style="font-size:22px;font-weight:bold;margin-top:-5px;margin-bottom:8px;color:#1899D6">
             CivReply AI
             </div>
             """, unsafe_allow_html=True
@@ -122,10 +117,7 @@ def try_asking():
     with col3: st.button("What are the rules for backyard sheds?", use_container_width=True, key="q3")
     with col4: st.button("Where can I find local events?", use_container_width=True, key="q4")
     with col5: st.button("How do I pay my rates online?", use_container_width=True, key="q5")
-    st.markdown(
-        "<button style='font-size:14px;border-radius:8px;background:#e3f4fc;padding:4px 18px;border:0;margin-top:4px;'>How does CivReply AI work?</button>",
-        unsafe_allow_html=True
-    )
+    # No "How does CivReply AI work?" button
 
 # --- PDF INDEXING/AI ---
 def build_pdf_index(pdf_dir: Path):
@@ -159,14 +151,14 @@ def send_email(subject, contents, to=ADMIN_EMAIL):
 def plan_selector():
     col1, col2, col3 = st.columns(3)
     with col1:
-        if st.button("Basic ($499/mo)", use_container_width=True):
-            st.session_state.plan = "Basic ($499 AUD/mo)"
+        if st.button("Basic", use_container_width=True):
+            st.session_state.plan = "Basic"
     with col2:
-        if st.button("Standard ($1,499/mo)", use_container_width=True):
-            st.session_state.plan = "Standard ($1,499 AUD/mo)"
+        if st.button("Standard", use_container_width=True):
+            st.session_state.plan = "Standard"
     with col3:
-        if st.button("Enterprise ($2,999+/mo)", use_container_width=True):
-            st.session_state.plan = "Enterprise ($2,999+ AUD/mo)"
+        if st.button("Enterprise", use_container_width=True):
+            st.session_state.plan = "Enterprise"
 
 header()
 council_status()
