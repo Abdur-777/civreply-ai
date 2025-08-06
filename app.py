@@ -1,7 +1,8 @@
+import os
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "/etc/gcs_creds.json")
+
 import streamlit as st
 from pathlib import Path
-import os
-import yagmail
 from dotenv import load_dotenv
 
 from langchain_community.document_loaders import PyPDFDirectoryLoader
@@ -11,6 +12,7 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains import RetrievalQA
 
 from google.cloud import storage
+import yagmail
 
 # --- CONFIG ---
 load_dotenv()
@@ -19,7 +21,7 @@ ADMIN_EMAIL = "civreplywyndham@gmail.com"
 YAGMAIL_PASS = os.getenv("YAGMAIL_PASS")
 CIVREPLY_ADMIN_PASS = os.getenv("CIVREPLY_ADMIN_PASS", "admin123")
 GCS_BUCKET = os.getenv("GCS_BUCKET")
-COUNCILS = ["Wyndham", "Yarra", "Casey", "Melbourne"]  # Example councils
+COUNCILS = ["Wyndham", "Yarra", "Casey", "Melbourne"]
 LANG = "English"
 
 st.set_page_config("CivReply AI", layout="wide", page_icon="🏛️")
@@ -54,10 +56,10 @@ if 'active_council' not in st.session_state:
 if 'user_type' not in st.session_state:
     st.session_state.user_type = "Resident"
 
-# --- HEADER, etc. (same as before, snipped for brevity) ---
+# --- HEADER ---
 def header():
     st.markdown(
-        f"""
+        """
         <div style='background: linear-gradient(90deg, #48bbff 0%, #1899D6 100%); border-radius:32px; padding:24px 12px 16px 32px; margin-bottom:12px;'>
             <span style="font-size:60px;vertical-align:middle">🏛️</span>
             <span style="font-size:46px;font-weight:bold;color:white;vertical-align:middle;margin-left:16px;">
@@ -71,7 +73,6 @@ def council_status():
     col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
     col1.markdown(f"<b>🏛️ Active Council:</b> {st.session_state.active_council}", unsafe_allow_html=True)
     col2.markdown(f"<b>💼 Plan:</b> {st.session_state.plan}", unsafe_allow_html=True)
-    # --- User type dropdown
     user_types = ["Resident", "Visitor", "Staff"]
     st.session_state.user_type = col3.selectbox("Type", user_types, index=user_types.index(st.session_state.user_type), label_visibility="collapsed")
     col4.markdown(f"<b>🌐 Language:</b> {LANG}", unsafe_allow_html=True)
@@ -86,11 +87,10 @@ def sidebar():
             </div>
             """, unsafe_allow_html=True
         )
-        # --- Multi-council dropdown
         selected = st.selectbox("Council", COUNCILS, index=COUNCILS.index(st.session_state.active_council))
         if selected != st.session_state.active_council:
             st.session_state.active_council = selected
-            st.session_state.pdf_index = None  # Reset, will re-load on switch
+            st.session_state.pdf_index = None
             st.session_state.chat_history = []
             st.experimental_rerun()
         nav = st.radio("",
@@ -164,29 +164,23 @@ header()
 council_status()
 sidebar_choice = sidebar()
 
-# --- GCS paths for FAISS + PDFs (per council) ---
 def council_index_path(council): return f"faiss_indexes/{council.lower()}_index"
 def council_pdf_dir(council): return f"pdfs/{council.lower()}"
 
-# --- On load: try to load FAISS index from GCS or local ---
 active_council = st.session_state.active_council
 faiss_path = f"index/{active_council.lower()}_index"
 pdf_dir = Path(f"council_docs/{active_council}")
 
 embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 
-# Download FAISS index from GCS if not exists locally, and load into session state
 if st.session_state.pdf_index is None:
-    # Try GCS first
     faiss_gcs_path = council_index_path(active_council)
     faiss_local_path = f"{faiss_path}"
     if not os.path.exists(faiss_local_path) and GCS_BUCKET:
         download_from_gcs(GCS_BUCKET, faiss_gcs_path, faiss_local_path)
-    # Load FAISS if now exists
     if os.path.exists(faiss_local_path):
         st.session_state.pdf_index = load_faiss_index(faiss_local_path, embeddings)
 
-# === Navigation routing ===
 if sidebar_choice == "Chat with Council AI":
     st.markdown("### 💬 Ask " + active_council + " Council")
     try_asking()
@@ -225,15 +219,11 @@ elif sidebar_choice == "Admin Panel":
         if uploaded_pdfs:
             pdf_dir.mkdir(parents=True, exist_ok=True)
             for pdf in uploaded_pdfs:
-                # Save locally
                 with open(pdf_dir / pdf.name, "wb") as f:
                     f.write(pdf.getbuffer())
-                # Upload to GCS
                 if GCS_BUCKET:
                     upload_to_gcs(str(pdf_dir / pdf.name), GCS_BUCKET, f"{council_pdf_dir(active_council)}/{pdf.name}")
-            # Re-index
             st.session_state.pdf_index = build_pdf_index(pdf_dir, faiss_path)
-            # Upload new FAISS index to GCS
             if GCS_BUCKET:
                 upload_to_gcs(faiss_path, GCS_BUCKET, council_index_path(active_council))
             st.success("PDFs indexed for AI Q&A! Return to Chat to try it out.")
@@ -241,8 +231,6 @@ elif sidebar_choice == "Admin Panel":
             st.session_state.chat_history = []
             st.session_state.pdf_index = None
             st.success("Session reset.")
-
-# ... (rest of your navigation/actions here, same as before)
 
 st.markdown("""
 <br>
