@@ -1,3 +1,0 @@
-git add logo.png
-git commit -m "Add logo.png for Streamlit sidebar"
-git push
