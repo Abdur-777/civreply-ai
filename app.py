@@ -9,16 +9,17 @@ from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain.chains import RetrievalQA
 
 # --- CONFIG ---
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ADMIN_EMAIL = "civreplywyndham@gmail.com"
-YAGMAIL_PASS = os.getenv("YAGMAIL_PASS")
+YAGMAIL_PASS = os.getenv("YAGMAIL_PASS")  # Set this as an ENV VAR on Render, not in .env in code
+CIVREPLY_ADMIN_PASS = os.getenv("CIVREPLY_ADMIN_PASS", "admin123")
 COUNCIL = "Wyndham"
 LANG = "English"
 
-# --- STREAMLIT PAGE CONFIG ---
 st.set_page_config("CivReply AI", layout="wide", page_icon="🏛️")
 
 # --- SESSION STATE ---
@@ -73,7 +74,6 @@ def council_status():
         """, unsafe_allow_html=True
     )
 
-# --- SIDEBAR ---
 def sidebar():
     with st.sidebar:
         st.image("logo.png", width=170)
@@ -102,7 +102,6 @@ def sidebar():
         st.button("🚀 Upgrade Your Plan", use_container_width=True, key="upgrade")
     return nav
 
-# --- "Try asking" SUGGESTIONS ---
 def try_asking():
     st.markdown(
         """
@@ -117,7 +116,6 @@ def try_asking():
     with col3: st.button("What are the rules for backyard sheds?", use_container_width=True, key="q3")
     with col4: st.button("Where can I find local events?", use_container_width=True, key="q4")
     with col5: st.button("How do I pay my rates online?", use_container_width=True, key="q5")
-
     st.markdown(
         "<button style='font-size:14px;border-radius:8px;background:#e3f4fc;padding:4px 18px;border:0;margin-top:4px;'>How does CivReply AI work?</button>",
         unsafe_allow_html=True
@@ -125,7 +123,6 @@ def try_asking():
 
 # --- PDF INDEXING/AI ---
 def build_pdf_index(pdf_dir: Path):
-    # Index all PDFs in the given directory
     loader = PyPDFDirectoryLoader(str(pdf_dir))
     docs = loader.load()
     splitter = RecursiveCharacterTextSplitter(chunk_size=1200, chunk_overlap=180)
@@ -144,7 +141,6 @@ def ai_qa(question: str, vectorstore):
     resp = chain({"query": question})
     return resp.get("result", "No answer found.")
 
-# --- EMAIL: FEEDBACK/CONTACT US ---
 def send_email(subject, contents, to=ADMIN_EMAIL):
     try:
         yag = yagmail.SMTP(ADMIN_EMAIL, YAGMAIL_PASS)
@@ -154,7 +150,6 @@ def send_email(subject, contents, to=ADMIN_EMAIL):
         st.error(f"Email send failed: {e}")
         return False
 
-# --- PLAN SELECTOR ---
 def plan_selector():
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -167,7 +162,6 @@ def plan_selector():
         if st.button("Enterprise ($2,999+/mo)", use_container_width=True):
             st.session_state.plan = "Enterprise ($2,999+ AUD/mo)"
 
-# --- MAIN CONTENT ---
 header()
 council_status()
 sidebar_choice = sidebar()
@@ -177,7 +171,7 @@ if sidebar_choice == "Chat with Council AI":
     welcome()
     try_asking()
     st.markdown("### 💬 Ask Wyndham Council")
-    if 'pdf_index' not in st.session_state or st.session_state.pdf_index is None:
+    if st.session_state.pdf_index is None:
         st.warning("No PDFs indexed yet. Please upload council documents via the Admin Panel.")
     else:
         for sender, text in st.session_state.chat_history:
@@ -245,7 +239,7 @@ elif sidebar_choice == "Admin Panel":
     if st.session_state.role != "admin":
         pwd = st.text_input("Enter admin password", type="password")
         if st.button("Login as admin"):
-            if pwd == os.getenv("CIVREPLY_ADMIN_PASS", "admin123"):
+            if pwd == CIVREPLY_ADMIN_PASS:
                 st.session_state.role = "admin"
                 st.success("Welcome, admin.")
                 st.experimental_rerun()
@@ -255,20 +249,19 @@ elif sidebar_choice == "Admin Panel":
         st.write("Upload Council PDFs to index for AI Q&A.")
         pdf_dir = st.file_uploader("Upload multiple PDFs", accept_multiple_files=True, type="pdf")
         if pdf_dir:
-            # Save and index
             doc_dir = Path("council_docs")
             doc_dir.mkdir(exist_ok=True)
             for pdf in pdf_dir:
                 with open(doc_dir / pdf.name, "wb") as f:
                     f.write(pdf.getbuffer())
             st.session_state.pdf_index = build_pdf_index(doc_dir)
+            st.session_state.chat_history = []  # Clear chat on re-index
             st.success("PDFs indexed for AI Q&A! Return to Chat to try it out.")
         if st.button("Reset Session"):
             st.session_state.chat_history = []
             st.session_state.pdf_index = None
             st.success("Session reset.")
 
-# --- FOOTER ---
 st.markdown("""
 <br>
 <div style='font-size:13px;text-align:center;color:#aaa'>Made with 🏛️ CivReply AI – for Australian councils, powered by AI</div>
