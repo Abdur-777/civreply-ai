@@ -1,4 +1,4 @@
-iimport yagmail
+import yagmail
 import os
 
 def send_civreply_email(user_email, question, answer, pdf_paths):
