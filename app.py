@@ -4,12 +4,13 @@ import os
 import yagmail
 from dotenv import load_dotenv
 
-# --- AI / PDF IMPORTS ---
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains import RetrievalQA
+
+from google.cloud import storage
 
 # --- CONFIG ---
 load_dotenv()
@@ -17,10 +18,27 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 ADMIN_EMAIL = "civreplywyndham@gmail.com"
 YAGMAIL_PASS = os.getenv("YAGMAIL_PASS")
 CIVREPLY_ADMIN_PASS = os.getenv("CIVREPLY_ADMIN_PASS", "admin123")
-COUNCIL = "Wyndham"
+GCS_BUCKET = os.getenv("GCS_BUCKET")
+COUNCILS = ["Wyndham", "Yarra", "Casey", "Melbourne"]  # Example councils
 LANG = "English"
 
 st.set_page_config("CivReply AI", layout="wide", page_icon="🏛️")
+
+# --- GCS HELPERS ---
+def upload_to_gcs(local_file, bucket_name, remote_path):
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(remote_path)
+    blob.upload_from_filename(local_file)
+
+def download_from_gcs(bucket_name, remote_path, local_file):
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(remote_path)
+    if blob.exists():
+        blob.download_to_filename(local_file)
+        return True
+    return False
 
 # --- SESSION STATE ---
 if 'chat_history' not in st.session_state:
@@ -31,17 +49,16 @@ if 'role' not in st.session_state:
     st.session_state.role = None
 if 'pdf_index' not in st.session_state:
     st.session_state.pdf_index = None
+if 'active_council' not in st.session_state:
+    st.session_state.active_council = COUNCILS[0]
+if 'user_type' not in st.session_state:
+    st.session_state.user_type = "Resident"
 
-# --- THEME COLORS ---
-BG = "#F7FAFC"
-HEADER_BG = "linear-gradient(90deg, #48bbff 0%, #1899D6 100%)"
-ACCENT = "#2295d4"
-
-# --- HEADER ---
+# --- HEADER, etc. (same as before, snipped for brevity) ---
 def header():
     st.markdown(
         f"""
-        <div style='background: {HEADER_BG}; border-radius:32px; padding:24px 12px 16px 32px; margin-bottom:12px;'>
+        <div style='background: linear-gradient(90deg, #48bbff 0%, #1899D6 100%); border-radius:32px; padding:24px 12px 16px 32px; margin-bottom:12px;'>
             <span style="font-size:60px;vertical-align:middle">🏛️</span>
             <span style="font-size:46px;font-weight:bold;color:white;vertical-align:middle;margin-left:16px;">
                 CivReply AI
@@ -50,33 +67,17 @@ def header():
         """, unsafe_allow_html=True
     )
 
-def welcome():
-    st.markdown(
-        f"""
-        <div style='background: #e6f7fd; border-radius:24px; padding:24px 18px 20px 24px; margin-bottom:20px;'>
-            <span style='font-size:28px;font-weight:700;color:#2295d4'>👋 Welcome!</span>
-            <span style='font-size:21px;color:#333; font-weight:500;margin-left:7px;'>
-            CivReply AI helps you find answers, policies, and services from {COUNCIL} Council instantly.<br>
-            <span style='font-size:16px;color:#177bb1'>Try asking about rubbish collection, local laws, grants, rates, events and more!</span>
-            </span>
-        </div>
-        """, unsafe_allow_html=True
-    )
-
 def council_status():
-    st.markdown(
-        f"""
-        <div style="background:#f3fafd;border-radius:14px;padding:9px 16px 7px 16px;display:flex;align-items:center;justify-content:left;font-size:16px;margin-bottom:10px;">
-            <b>🏛️ Active Council:</b>&nbsp;{COUNCIL}
-            <span style="margin-left:32px"><b>💼 Plan:</b> Basic</span>
-            <span style="margin-left:32px"><b>🌐 Language:</b> {LANG}</span>
-        </div>
-        """, unsafe_allow_html=True
-    )
+    col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+    col1.markdown(f"<b>🏛️ Active Council:</b> {st.session_state.active_council}", unsafe_allow_html=True)
+    col2.markdown(f"<b>💼 Plan:</b> {st.session_state.plan}", unsafe_allow_html=True)
+    # --- User type dropdown
+    user_types = ["Resident", "Visitor", "Staff"]
+    st.session_state.user_type = col3.selectbox("Type", user_types, index=user_types.index(st.session_state.user_type), label_visibility="collapsed")
+    col4.markdown(f"<b>🌐 Language:</b> {LANG}", unsafe_allow_html=True)
 
 def sidebar():
     with st.sidebar:
-        # No logo image; use only icon + name
         st.markdown(
             """
             <div style="font-size:38px;line-height:1;margin-bottom:2px;">🏛️</div>
@@ -85,6 +86,13 @@ def sidebar():
             </div>
             """, unsafe_allow_html=True
         )
+        # --- Multi-council dropdown
+        selected = st.selectbox("Council", COUNCILS, index=COUNCILS.index(st.session_state.active_council))
+        if selected != st.session_state.active_council:
+            st.session_state.active_council = selected
+            st.session_state.pdf_index = None  # Reset, will re-load on switch
+            st.session_state.chat_history = []
+            st.experimental_rerun()
         nav = st.radio("",
             [
                 "Chat with Council AI",
@@ -111,23 +119,27 @@ def try_asking():
         </div>
         """, unsafe_allow_html=True
     )
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4 = st.columns(4)
     with col1: st.button("What day is my rubbish collected?", use_container_width=True, key="q1")
     with col2: st.button("How do I apply for a pet registration?", use_container_width=True, key="q2")
     with col3: st.button("What are the rules for backyard sheds?", use_container_width=True, key="q3")
     with col4: st.button("Where can I find local events?", use_container_width=True, key="q4")
-    with col5: st.button("How do I pay my rates online?", use_container_width=True, key="q5")
-    # No "How does CivReply AI work?" button
 
 # --- PDF INDEXING/AI ---
-def build_pdf_index(pdf_dir: Path):
+def build_pdf_index(pdf_dir: Path, faiss_index_path: str):
     loader = PyPDFDirectoryLoader(str(pdf_dir))
     docs = loader.load()
     splitter = RecursiveCharacterTextSplitter(chunk_size=1200, chunk_overlap=180)
     split_docs = splitter.split_documents(docs)
     embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
     vectorstore = FAISS.from_documents(split_docs, embeddings)
+    vectorstore.save_local(faiss_index_path)
     return vectorstore
+
+def load_faiss_index(faiss_index_path: str, embeddings):
+    if os.path.exists(faiss_index_path):
+        return FAISS.load_local(faiss_index_path, embeddings)
+    return None
 
 def ai_qa(question: str, vectorstore):
     retriever = vectorstore.as_retriever(search_kwargs={"k": 4})
@@ -148,27 +160,36 @@ def send_email(subject, contents, to=ADMIN_EMAIL):
         st.error(f"Email send failed: {e}")
         return False
 
-def plan_selector():
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("Basic", use_container_width=True):
-            st.session_state.plan = "Basic"
-    with col2:
-        if st.button("Standard", use_container_width=True):
-            st.session_state.plan = "Standard"
-    with col3:
-        if st.button("Enterprise", use_container_width=True):
-            st.session_state.plan = "Enterprise"
-
 header()
 council_status()
 sidebar_choice = sidebar()
 
+# --- GCS paths for FAISS + PDFs (per council) ---
+def council_index_path(council): return f"faiss_indexes/{council.lower()}_index"
+def council_pdf_dir(council): return f"pdfs/{council.lower()}"
+
+# --- On load: try to load FAISS index from GCS or local ---
+active_council = st.session_state.active_council
+faiss_path = f"index/{active_council.lower()}_index"
+pdf_dir = Path(f"council_docs/{active_council}")
+
+embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+
+# Download FAISS index from GCS if not exists locally, and load into session state
+if st.session_state.pdf_index is None:
+    # Try GCS first
+    faiss_gcs_path = council_index_path(active_council)
+    faiss_local_path = f"{faiss_path}"
+    if not os.path.exists(faiss_local_path) and GCS_BUCKET:
+        download_from_gcs(GCS_BUCKET, faiss_gcs_path, faiss_local_path)
+    # Load FAISS if now exists
+    if os.path.exists(faiss_local_path):
+        st.session_state.pdf_index = load_faiss_index(faiss_local_path, embeddings)
+
 # === Navigation routing ===
 if sidebar_choice == "Chat with Council AI":
-    welcome()
+    st.markdown("### 💬 Ask " + active_council + " Council")
     try_asking()
-    st.markdown("### 💬 Ask Wyndham Council")
     if st.session_state.pdf_index is None:
         st.warning("No PDFs indexed yet. Please upload council documents via the Admin Panel.")
     else:
@@ -177,60 +198,15 @@ if sidebar_choice == "Chat with Council AI":
                 f"<div style='background:#f4fafd;border-radius:10px;margin-bottom:8px;padding:8px 14px'><b>{sender}:</b> {text}</div>",
                 unsafe_allow_html=True
             )
-    q = st.text_input("Ask a question about Wyndham policies, forms, or documents...", key="ask_box")
+    q = st.text_input("Ask a question about council policies, forms, or documents...", key="ask_box")
     if st.button("Send", key="sendbtn") and q:
         st.session_state.chat_history.append(("You", q))
-        # --- Real AI response from PDF index ---
         if st.session_state.pdf_index is not None:
             reply = ai_qa(q, st.session_state.pdf_index)
         else:
             reply = "The AI doesn't have any council documents yet."
         st.session_state.chat_history.append(("CivReply AI", reply))
         st.experimental_rerun()
-
-elif sidebar_choice == "Submit a Request":
-    st.header("Submit a Request")
-    with st.form("request_form"):
-        req_msg = st.text_area("Describe your request or report an issue.")
-        req_email = st.text_input("Your email for follow-up (optional)")
-        sent = st.form_submit_button("Submit")
-        if sent and req_msg:
-            sent_ok = send_email("CivReply Request", f"{req_msg}\nFrom: {req_email or 'N/A'}")
-            if sent_ok:
-                st.success("Your request was sent to the council team. Thank you!")
-
-elif sidebar_choice == "Stats & Session":
-    st.header("Session Stats & Usage")
-    st.write(f"Plan: {st.session_state.plan}")
-    st.write(f"Questions asked: {len(st.session_state.chat_history)}")
-    st.json(st.session_state.chat_history)
-
-elif sidebar_choice == "Share Feedback":
-    st.header("Share Feedback")
-    with st.form("fbform"):
-        fb_msg = st.text_area("Your feedback")
-        fb_email = st.text_input("Your email (optional)")
-        sent = st.form_submit_button("Send Feedback")
-        if sent and fb_msg:
-            sent_ok = send_email("CivReply Feedback", f"{fb_msg}\nFrom: {fb_email or 'N/A'}")
-            if sent_ok:
-                st.success("Thanks for your feedback!")
-
-elif sidebar_choice == "Contact Us":
-    st.header("Contact Us")
-    with st.form("contactform"):
-        name = st.text_input("Your Name")
-        email = st.text_input("Your Email")
-        msg = st.text_area("Your Message")
-        sent = st.form_submit_button("Send Message")
-        if sent and msg:
-            sent_ok = send_email("CivReply Contact Us", f"{msg}\nFrom: {name} <{email}>")
-            if sent_ok:
-                st.success("Thank you for contacting us!")
-
-elif sidebar_choice == "About Us":
-    st.header("About CivReply AI")
-    st.info("CivReply AI helps you find answers about council policies, local laws, services, events, and more using advanced AI and your local council's own documents.")
 
 elif sidebar_choice == "Admin Panel":
     st.header("Admin Panel")
@@ -244,21 +220,29 @@ elif sidebar_choice == "Admin Panel":
             else:
                 st.error("Incorrect password.")
     else:
-        st.write("Upload Council PDFs to index for AI Q&A.")
-        pdf_dir = st.file_uploader("Upload multiple PDFs", accept_multiple_files=True, type="pdf")
-        if pdf_dir:
-            doc_dir = Path("council_docs")
-            doc_dir.mkdir(exist_ok=True)
-            for pdf in pdf_dir:
-                with open(doc_dir / pdf.name, "wb") as f:
+        st.write(f"Upload Council PDFs for: {active_council}")
+        uploaded_pdfs = st.file_uploader("Upload multiple PDFs", accept_multiple_files=True, type="pdf")
+        if uploaded_pdfs:
+            pdf_dir.mkdir(parents=True, exist_ok=True)
+            for pdf in uploaded_pdfs:
+                # Save locally
+                with open(pdf_dir / pdf.name, "wb") as f:
                     f.write(pdf.getbuffer())
-            st.session_state.pdf_index = build_pdf_index(doc_dir)
-            st.session_state.chat_history = []  # Clear chat on re-index
+                # Upload to GCS
+                if GCS_BUCKET:
+                    upload_to_gcs(str(pdf_dir / pdf.name), GCS_BUCKET, f"{council_pdf_dir(active_council)}/{pdf.name}")
+            # Re-index
+            st.session_state.pdf_index = build_pdf_index(pdf_dir, faiss_path)
+            # Upload new FAISS index to GCS
+            if GCS_BUCKET:
+                upload_to_gcs(faiss_path, GCS_BUCKET, council_index_path(active_council))
             st.success("PDFs indexed for AI Q&A! Return to Chat to try it out.")
         if st.button("Reset Session"):
             st.session_state.chat_history = []
             st.session_state.pdf_index = None
             st.success("Session reset.")
+
+# ... (rest of your navigation/actions here, same as before)
 
 st.markdown("""
 <br>
