@@ -3,6 +3,7 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CRE
 
 import streamlit as st
 from pathlib import Path
+import yagmail
 from dotenv import load_dotenv
 
 from langchain_community.document_loaders import PyPDFDirectoryLoader
@@ -12,7 +13,6 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain.chains import RetrievalQA
 
 from google.cloud import storage
-import yagmail
 
 # --- CONFIG ---
 load_dotenv()
@@ -21,7 +21,7 @@ ADMIN_EMAIL = "civreplywyndham@gmail.com"
 YAGMAIL_PASS = os.getenv("YAGMAIL_PASS")
 CIVREPLY_ADMIN_PASS = os.getenv("CIVREPLY_ADMIN_PASS", "admin123")
 GCS_BUCKET = os.getenv("GCS_BUCKET")
-COUNCILS = ["Wyndham", "Yarra", "Casey", "Melbourne"]
+COUNCILS = ["Wyndham", "Yarra", "Casey", "Melbourne"]  # Example
 LANG = "English"
 
 st.set_page_config("CivReply AI", layout="wide", page_icon="🏛️")
@@ -48,18 +48,16 @@ if 'chat_history' not in st.session_state:
 if 'plan' not in st.session_state:
     st.session_state.plan = "Basic"
 if 'role' not in st.session_state:
-    st.session_state.role = None
+    st.session_state.role = "Resident"
 if 'pdf_index' not in st.session_state:
     st.session_state.pdf_index = None
 if 'active_council' not in st.session_state:
     st.session_state.active_council = COUNCILS[0]
-if 'user_type' not in st.session_state:
-    st.session_state.user_type = "Resident"
 
-# --- HEADER ---
+# --- HEADER, etc. ---
 def header():
     st.markdown(
-        """
+        f"""
         <div style='background: linear-gradient(90deg, #48bbff 0%, #1899D6 100%); border-radius:32px; padding:24px 12px 16px 32px; margin-bottom:12px;'>
             <span style="font-size:60px;vertical-align:middle">🏛️</span>
             <span style="font-size:46px;font-weight:bold;color:white;vertical-align:middle;margin-left:16px;">
@@ -70,21 +68,15 @@ def header():
     )
 
 def council_status():
-    # Inline, minimal columns: Plan, Role, Language
-    col1, col2, col3, col4 = st.columns([2, 1, 1, 1.3])
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 2])
     col1.markdown(f"<b>🏛️ Active Council:</b> {st.session_state.active_council}", unsafe_allow_html=True)
-    col2.markdown(f"<b>💼 Plan:</b> <span style='color:#2295d4'>{st.session_state.plan}</span>", unsafe_allow_html=True)
-
-    user_types = ["Resident", "Visitor", "Staff"]
-    with col3:
-        st.session_state.user_type = st.selectbox(
-            "Role",
-            user_types,
-            index=user_types.index(st.session_state.user_type),
-            label_visibility="collapsed",
-            key="user_type"
-        )
-    col4.markdown(f"<b>🌐 Language:</b> <span style='color:#2295d4'>{LANG}</span>", unsafe_allow_html=True)
+    # --- Plan dropdown (small)
+    plans = ["Basic", "Standard", "Enterprise"]
+    st.session_state.plan = col2.selectbox("Plan", plans, index=plans.index(st.session_state.plan), label_visibility="collapsed")
+    # --- Role dropdown (small)
+    roles = ["Resident", "Visitor", "Staff"]
+    st.session_state.role = col3.selectbox("Role", roles, index=roles.index(st.session_state.role), label_visibility="collapsed")
+    col4.markdown(f"<b>🌐 Language:</b> {LANG}", unsafe_allow_html=True)
 
 def sidebar():
     with st.sidebar:
@@ -96,6 +88,7 @@ def sidebar():
             </div>
             """, unsafe_allow_html=True
         )
+        # --- Multi-council dropdown
         selected = st.selectbox("Council", COUNCILS, index=COUNCILS.index(st.session_state.active_council))
         if selected != st.session_state.active_council:
             st.session_state.active_council = selected
@@ -173,15 +166,18 @@ header()
 council_status()
 sidebar_choice = sidebar()
 
+# --- GCS paths for FAISS + PDFs (per council) ---
 def council_index_path(council): return f"faiss_indexes/{council.lower()}_index"
 def council_pdf_dir(council): return f"pdfs/{council.lower()}"
 
+# --- On load: try to load FAISS index from GCS or local ---
 active_council = st.session_state.active_council
 faiss_path = f"index/{active_council.lower()}_index"
 pdf_dir = Path(f"council_docs/{active_council}")
 
 embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 
+# Download FAISS index from GCS if not exists locally, and load into session state
 if st.session_state.pdf_index is None:
     faiss_gcs_path = council_index_path(active_council)
     faiss_local_path = f"{faiss_path}"
@@ -190,6 +186,7 @@ if st.session_state.pdf_index is None:
     if os.path.exists(faiss_local_path):
         st.session_state.pdf_index = load_faiss_index(faiss_local_path, embeddings)
 
+# === Navigation routing ===
 if sidebar_choice == "Chat with Council AI":
     st.markdown("### 💬 Ask " + active_council + " Council")
     try_asking()
@@ -210,6 +207,51 @@ if sidebar_choice == "Chat with Council AI":
             reply = "The AI doesn't have any council documents yet."
         st.session_state.chat_history.append(("CivReply AI", reply))
         st.experimental_rerun()
+
+elif sidebar_choice == "Submit a Request":
+    st.header("Submit a Request")
+    with st.form("request_form"):
+        req_msg = st.text_area("Describe your request or report an issue.")
+        req_email = st.text_input("Your email for follow-up (optional)")
+        sent = st.form_submit_button("Submit")
+        if sent and req_msg:
+            sent_ok = send_email("CivReply Request", f"{req_msg}\nFrom: {req_email or 'N/A'}")
+            if sent_ok:
+                st.success("Your request was sent to the council team. Thank you!")
+
+elif sidebar_choice == "Stats & Session":
+    st.header("Session Stats & Usage")
+    st.write(f"Plan: {st.session_state.plan}")
+    st.write(f"Role: {st.session_state.role}")
+    st.write(f"Questions asked: {len(st.session_state.chat_history)}")
+    st.json(st.session_state.chat_history)
+
+elif sidebar_choice == "Share Feedback":
+    st.header("Share Feedback")
+    with st.form("fbform"):
+        fb_msg = st.text_area("Your feedback")
+        fb_email = st.text_input("Your email (optional)")
+        sent = st.form_submit_button("Send Feedback")
+        if sent and fb_msg:
+            sent_ok = send_email("CivReply Feedback", f"{fb_msg}\nFrom: {fb_email or 'N/A'}")
+            if sent_ok:
+                st.success("Thanks for your feedback!")
+
+elif sidebar_choice == "Contact Us":
+    st.header("Contact Us")
+    with st.form("contactform"):
+        name = st.text_input("Your Name")
+        email = st.text_input("Your Email")
+        msg = st.text_area("Your Message")
+        sent = st.form_submit_button("Send Message")
+        if sent and msg:
+            sent_ok = send_email("CivReply Contact Us", f"{msg}\nFrom: {name} <{email}>")
+            if sent_ok:
+                st.success("Thank you for contacting us!")
+
+elif sidebar_choice == "About Us":
+    st.header("About CivReply AI")
+    st.info("CivReply AI helps you find answers about council policies, local laws, services, events, and more using advanced AI and your local council's own documents.")
 
 elif sidebar_choice == "Admin Panel":
     st.header("Admin Panel")
