@@ -76,7 +76,13 @@ def council_status():
 
 def sidebar():
     with st.sidebar:
-        st.image("logo.png", width=170)
+        # Logo (safe fallback)
+        import os
+        if os.path.exists("logo.png"):
+            st.image("logo.png", width=170)
+        else:
+            st.write("🏛️ CivReply AI")
+        
         st.markdown(
             """
             <div style="font-size:22px;font-weight:bold;margin-top:-10px;margin-bottom:8px;color:#1899D6">
