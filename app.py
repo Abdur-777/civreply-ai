@@ -70,12 +70,21 @@ def header():
     )
 
 def council_status():
-    col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+    # Inline, minimal columns: Plan, Role, Language
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1.3])
     col1.markdown(f"<b>🏛️ Active Council:</b> {st.session_state.active_council}", unsafe_allow_html=True)
-    col2.markdown(f"<b>💼 Plan:</b> {st.session_state.plan}", unsafe_allow_html=True)
+    col2.markdown(f"<b>💼 Plan:</b> <span style='color:#2295d4'>{st.session_state.plan}</span>", unsafe_allow_html=True)
+
     user_types = ["Resident", "Visitor", "Staff"]
-    st.session_state.user_type = col3.selectbox("Type", user_types, index=user_types.index(st.session_state.user_type), label_visibility="collapsed")
-    col4.markdown(f"<b>🌐 Language:</b> {LANG}", unsafe_allow_html=True)
+    with col3:
+        st.session_state.user_type = st.selectbox(
+            "Role",
+            user_types,
+            index=user_types.index(st.session_state.user_type),
+            label_visibility="collapsed",
+            key="user_type"
+        )
+    col4.markdown(f"<b>🌐 Language:</b> <span style='color:#2295d4'>{LANG}</span>", unsafe_allow_html=True)
 
 def sidebar():
     with st.sidebar:
