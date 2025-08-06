@@ -1,7 +1,7 @@
 setuptools>=65.5.1
 wheel
 streamlit==1.32.0
-openai==1.30.5
+openai==1.17.0
 tiktoken==0.7.0
 langchain==0.1.16
 langchain-community==0.0.32
@@ -17,5 +17,4 @@ tenacity==8.2.3
 yagmail==0.15.293
 fpdf==1.7.2
 deep-translator==1.11.4
-boto3==1.34.118
 google-cloud-storage==2.16.0
